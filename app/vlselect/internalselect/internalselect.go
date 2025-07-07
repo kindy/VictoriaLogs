@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"net/http"
 	"strconv"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/encoding/zstd"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/httpserver"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/netutil"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/timeutil"
 	"github.com/VictoriaMetrics/metrics"
 
 	"github.com/VictoriaMetrics/VictoriaLogs/app/vlstorage"
@@ -82,6 +84,7 @@ var requestHandlers = map[string]func(ctx context.Context, w http.ResponseWriter
 	"/internal/select/stream_field_values": processStreamFieldValuesRequest,
 	"/internal/select/streams":             processStreamsRequest,
 	"/internal/select/stream_ids":          processStreamIDsRequest,
+	"/internal/select/tenant_ids":          processTenantIDsRequest,
 }
 
 func processQueryRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
@@ -306,6 +309,30 @@ func processStreamIDsRequest(ctx context.Context, w http.ResponseWriter, r *http
 	return writeValuesWithHits(w, qctx, streamIDs, cp.DisableCompression)
 }
 
+func processTenantIDsRequest(ctx context.Context, w http.ResponseWriter, r *http.Request) error {
+	start, okStart, err := getTimeNsec(r, "start")
+	if err != nil {
+		return fmt.Errorf("cannot parse start timestamp: %w", err)
+	}
+	end, okEnd, err := getTimeNsec(r, "end")
+	if err != nil {
+		return fmt.Errorf("cannot parse end timestamp: %w", err)
+	}
+	if !okStart {
+		start = math.MinInt64
+	}
+	if !okEnd {
+		end = math.MaxInt64
+	}
+
+	tenantIDs, err := vlstorage.GetTenantIDs(ctx, start, end)
+	if err != nil {
+		return fmt.Errorf("cannot obtain tenant IDs: %w", err)
+	}
+
+	return writeTenantIDs(w, tenantIDs, false)
+}
+
 type commonParams struct {
 	TenantIDs []logstorage.TenantID
 	Query     *logstorage.Query
@@ -397,6 +424,17 @@ func writeValuesWithHits(w http.ResponseWriter, qctx *logstorage.QueryContext, v
 	return nil
 }
 
+func writeTenantIDs(w http.ResponseWriter, tenantIDs []byte, disableCompression bool) error {
+	if !disableCompression {
+		tenantIDs = zstd.CompressLevel(nil, tenantIDs, 1)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if _, err := w.Write(tenantIDs); err != nil {
+		return fmt.Errorf("cannot send response to the client: %w", err)
+	}
+	return nil
+}
+
 func marshalQueryStatsBlock(dst []byte, qctx *logstorage.QueryContext) []byte {
 	queryDurationNsecs := qctx.QueryDurationNsecs()
 	db := qctx.QueryStats.CreateDataBlock(queryDurationNsecs)
@@ -424,4 +462,17 @@ func getBoolFromRequest(dst *bool, r *http.Request, argName string) error {
 	}
 	*dst = b
 	return nil
+}
+
+func getTimeNsec(r *http.Request, argName string) (int64, bool, error) {
+	s := r.FormValue(argName)
+	if s == "" {
+		return 0, false, nil
+	}
+	currentTimestamp := time.Now().UnixNano()
+	nsecs, err := timeutil.ParseTimeAt(s, currentTimestamp)
+	if err != nil {
+		return 0, false, fmt.Errorf("cannot parse %s=%s: %w", argName, s, err)
+	}
+	return nsecs, true, nil
 }
