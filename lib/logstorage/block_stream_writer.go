@@ -6,8 +6,9 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/bytesutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	libfs "github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/slicesutil"
 )
 
@@ -33,7 +34,7 @@ func (w *writerWithStats) Path() string {
 }
 
 func (w *writerWithStats) MustWrite(data []byte) {
-	fs.MustWriteData(w.w, data)
+	libfs.MustWriteData(w.w, data)
 	w.bytesWritten += uint64(len(data))
 }
 
@@ -84,7 +85,7 @@ func (w *bloomValuesWriter) totalBytesWritten() uint64 {
 	return w.bloom.bytesWritten + w.values.bytesWritten
 }
 
-func (w *bloomValuesWriter) appendClosers(dst []fs.MustCloser) []fs.MustCloser {
+func (w *bloomValuesWriter) appendClosers(dst []libfs.MustCloser) []libfs.MustCloser {
 	dst = append(dst, &w.bloom)
 	dst = append(dst, &w.values)
 	return dst
@@ -158,7 +159,7 @@ func (sw *streamWriters) totalBytesWritten() uint64 {
 func (sw *streamWriters) MustClose() {
 	// Flush and close files in parallel in order to reduce the time needed for this operation
 	// on high-latency storage systems such as NFS or Ceph.
-	cs := []fs.MustCloser{
+	cs := []libfs.MustCloser{
 		&sw.columnNamesWriter,
 		&sw.columnIdxsWriter,
 		&sw.metaindexWriter,
@@ -173,7 +174,7 @@ func (sw *streamWriters) MustClose() {
 		cs = sw.bloomValuesShards[i].appendClosers(cs)
 	}
 
-	fs.MustCloseParallel(cs)
+	libfs.MustCloseParallel(cs)
 }
 
 func (sw *streamWriters) getBloomValuesWriterForColumnName(name string) *bloomValuesWriter {
@@ -282,7 +283,7 @@ func (bsw *blockStreamWriter) reset() {
 }
 
 // MustInitForInmemoryPart initializes bsw from mp
-func (bsw *blockStreamWriter) MustInitForInmemoryPart(mp *inmemoryPart) {
+func (bsw *blockStreamWriter) MustInitForInmemoryPart(fs objectstorage.FS, mp *inmemoryPart) {
 	bsw.reset()
 
 	messageBloomValues := mp.messageBloomValues.NewStreamWriter()
@@ -296,7 +297,7 @@ func (bsw *blockStreamWriter) MustInitForInmemoryPart(mp *inmemoryPart) {
 // MustInitForFilePart initializes bsw for writing data to file part located at path.
 //
 // if nocache is true, then the written data doesn't go to OS page cache.
-func (bsw *blockStreamWriter) MustInitForFilePart(path string, nocache bool) {
+func (bsw *blockStreamWriter) MustInitForFilePart(fs objectstorage.FS, path string, nocache bool) {
 	bsw.reset()
 
 	fs.MustMkdirFailIfExist(path)

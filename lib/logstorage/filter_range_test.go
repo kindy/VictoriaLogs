@@ -3,7 +3,7 @@ package logstorage
 import (
 	"testing"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestFilterRange(t *testing.T) {
@@ -681,6 +681,7 @@ func TestFilterRange(t *testing.T) {
 		testFilterMatchForColumns(t, columns, fr, "_msg", nil)
 	})
 
+	fs := objectstorage.New(t.Name())
 	// Remove the remaining data files for the test
-	fs.MustRemoveDir(t.Name())
+	fs.MustRemoveDir("")
 }

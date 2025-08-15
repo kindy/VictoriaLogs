@@ -7,8 +7,8 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/chunkedbuffer"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/encoding"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 type inmemoryPart struct {
@@ -34,7 +34,7 @@ func (mp *inmemoryPart) Reset() {
 }
 
 // MustStoreToDisk stores mp to the given path on disk.
-func (mp *inmemoryPart) MustStoreToDisk(path string) {
+func (mp *inmemoryPart) MustStoreToDisk(fs objectstorage.FS, path string) {
 	fs.MustMkdirFailIfExist(path)
 
 	metaindexPath := filepath.Join(path, metaindexFilename)
@@ -49,7 +49,7 @@ func (mp *inmemoryPart) MustStoreToDisk(path string) {
 	psw.Add(lensPath, &mp.lensData)
 	psw.Run()
 
-	mp.ph.MustWriteMetadata(path)
+	mp.ph.MustWriteMetadata(fs, path)
 
 	fs.MustSyncPathAndParentDir(path)
 }

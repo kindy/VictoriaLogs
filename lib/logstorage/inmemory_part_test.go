@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestInmemoryPartMustInitFromRows(t *testing.T) {
@@ -38,7 +39,8 @@ func TestInmemoryPartMustInitFromRows(t *testing.T) {
 
 		// Create inmemory part from lr
 		mp := getInmemoryPart()
-		mp.mustInitFromRows(&lr)
+		fs := objectstorage.New(t.Name())
+		mp.mustInitFromRows(fs, &lr)
 
 		// Check mp.ph
 		ph := &mp.ph
@@ -102,7 +104,7 @@ func TestInmemoryPartMustInitFromRows_Overflow(t *testing.T) {
 
 		// Create inmemory part from lr
 		mp := getInmemoryPart()
-		mp.mustInitFromRows(&lr)
+		mp.mustInitFromRows(nil, &lr)
 
 		// Check mp.ph
 		ph := &mp.ph
@@ -160,11 +162,11 @@ func TestInmemoryPartInitFromBlockStreamReaders(t *testing.T) {
 			lr.mustAddRows(lrOrig)
 
 			mp := getInmemoryPart()
-			mp.mustInitFromRows(&lr)
+			mp.mustInitFromRows(nil, &lr)
 			mpsSrc = append(mpsSrc, mp)
 
 			bsr := getBlockStreamReader()
-			bsr.MustInitFromInmemoryPart(mp)
+			bsr.MustInitFromInmemoryPart(nil, mp)
 			bsrs = append(bsrs, bsr)
 		}
 		defer func() {
@@ -179,7 +181,7 @@ func TestInmemoryPartInitFromBlockStreamReaders(t *testing.T) {
 		// Merge data from bsrs into mpDst
 		mpDst := getInmemoryPart()
 		bsw := getBlockStreamWriter()
-		bsw.MustInitForInmemoryPart(mpDst)
+		bsw.MustInitForInmemoryPart(nil, mpDst)
 		mustMergeBlockStreams(&mpDst.ph, bsw, bsrs, nil)
 		putBlockStreamWriter(bsw)
 
@@ -359,7 +361,7 @@ func (mp *inmemoryPart) readLogRows(sbu *stringsBlockUnmarshaler, vd *valuesDeco
 
 	bsr := getBlockStreamReader()
 	defer putBlockStreamReader(bsr)
-	bsr.MustInitFromInmemoryPart(mp)
+	bsr.MustInitFromInmemoryPart(nil, mp)
 	var tmp rows
 	for bsr.NextBlock() {
 		bd := &bsr.blockData

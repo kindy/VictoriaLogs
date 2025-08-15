@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/regexutil"
 )
 
@@ -373,7 +373,8 @@ func TestFilterRegexp(t *testing.T) {
 	})
 
 	// Remove the remaining data files for the test
-	fs.MustRemoveDir(t.Name())
+	fs := objectstorage.New(t.Name())
+	fs.MustRemoveDir("")
 }
 
 func TestSkipFirstLastToken(t *testing.T) {

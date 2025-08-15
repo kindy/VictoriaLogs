@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -16,9 +15,9 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/atomicutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/cgroup"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/memory"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/syncwg"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/timeutil"
 )
@@ -86,6 +85,7 @@ type Table struct {
 	mergeIdx atomic.Uint64
 
 	path string
+	fs   objectstorage.FS
 
 	// The interval for guaranteed flush of recently ingested data from memory to on-disk parts so they survive process crash.
 	flushInterval time.Duration
@@ -304,7 +304,7 @@ func (pw *partWrapper) incRef() {
 	pw.refCount.Add(1)
 }
 
-func (pw *partWrapper) decRef() {
+func (pw *partWrapper) decRef(fs objectstorage.FS) {
 	n := pw.refCount.Add(-1)
 	if n < 0 {
 		logger.Panicf("BUG: pw.refCount must be bigger than 0; got %d", n)
@@ -342,7 +342,7 @@ func (pw *partWrapper) decRef() {
 // to persistent storage.
 //
 // The table is created if it doesn't exist yet.
-func MustOpenTable(path string, flushInterval time.Duration, flushCallback func(), prepareBlock PrepareBlockCallback, isReadOnly *atomic.Bool) *Table {
+func MustOpenTable(fs objectstorage.FS, path string, flushInterval time.Duration, flushCallback func(), prepareBlock PrepareBlockCallback, isReadOnly *atomic.Bool) *Table {
 	path = filepath.Clean(path)
 
 	if flushInterval < pendingItemsFlushInterval {
@@ -355,9 +355,10 @@ func MustOpenTable(path string, flushInterval time.Duration, flushCallback func(
 	fs.MustMkdirIfNotExist(path)
 
 	// Open table parts.
-	pws := mustOpenParts(path)
+	pws := mustOpenParts(fs, path)
 
 	tb := &Table{
+		fs:                   fs,
 		path:                 path,
 		flushInterval:        flushInterval,
 		flushCallback:        flushCallback,
@@ -527,7 +528,7 @@ func (tb *Table) MustClose() {
 	tb.partsLock.Unlock()
 
 	for _, pw := range fileParts {
-		pw.decRef()
+		pw.decRef(tb.fs)
 	}
 }
 
@@ -689,7 +690,7 @@ func (tb *Table) getParts(dst []*partWrapper) []*partWrapper {
 // putParts releases the given pws obtained via getParts.
 func (tb *Table) putParts(pws []*partWrapper) {
 	for _, pw := range pws {
-		pw.decRef()
+		pw.decRef(tb.fs)
 	}
 }
 
@@ -1070,7 +1071,7 @@ func getMaxInmemoryPartSize() uint64 {
 }
 
 func (tb *Table) getMaxFilePartSize() uint64 {
-	n := fs.MustGetFreeSpace(tb.path)
+	n := tb.fs.MustGetFreeSpace()
 	// Divide free space by the max number of concurrent merges for file parts.
 	maxOutBytes := n / uint64(cap(filePartsConcurrencyCh))
 	if maxOutBytes > maxPartSize {
@@ -1203,14 +1204,14 @@ func (tb *Table) mergeParts(pws []*partWrapper, stopCh <-chan struct{}, isFinal 
 	if isFinal && len(pws) == 1 && pws[0].mp != nil {
 		// Fast path: flush a single in-memory part to disk.
 		mp := pws[0].mp
-		mp.MustStoreToDisk(dstPartPath)
+		mp.MustStoreToDisk(tb.fs, dstPartPath)
 		pwNew := tb.openCreatedPart(pws, nil, dstPartPath)
 		tb.swapSrcWithDstParts(pws, pwNew, dstPartType)
 		return nil
 	}
 
 	// Prepare BlockStreamReaders for source parts.
-	bsrs := mustOpenBlockStreamReaders(pws)
+	bsrs := mustOpenBlockStreamReaders(tb.fs, pws)
 
 	// Prepare BlockStreamWriter for destination part.
 	srcSize := uint64(0)
@@ -1229,7 +1230,7 @@ func (tb *Table) mergeParts(pws []*partWrapper, stopCh <-chan struct{}, isFinal 
 		bsw.MustInitFromInmemoryPart(mpNew, compressLevel)
 	} else {
 		nocache := srcItemsCount > maxItemsPerCachedPart()
-		bsw.MustInitFromFilePart(dstPartPath, nocache, compressLevel)
+		bsw.MustInitFromFilePart(tb.fs, dstPartPath, nocache, compressLevel)
 	}
 
 	// Merge source parts to destination part.
@@ -1246,7 +1247,7 @@ func (tb *Table) mergeParts(pws []*partWrapper, stopCh <-chan struct{}, isFinal 
 		mpNew.ph = *ph
 	} else {
 		// Make sure the created part directory listing is synced.
-		fs.MustSyncPathAndParentDir(dstPartPath)
+		tb.fs.MustSyncPathAndParentDir(dstPartPath)
 	}
 
 	// Atomically swap the source parts with the newly created part.
@@ -1302,14 +1303,14 @@ func getDstPartType(pws []*partWrapper, isFinal bool) partType {
 	return partInmemory
 }
 
-func mustOpenBlockStreamReaders(pws []*partWrapper) []*blockStreamReader {
+func mustOpenBlockStreamReaders(fs objectstorage.FS, pws []*partWrapper) []*blockStreamReader {
 	bsrs := make([]*blockStreamReader, 0, len(pws))
 	for _, pw := range pws {
 		bsr := getBlockStreamReader()
 		if pw.mp != nil {
 			bsr.MustInitFromInmemoryPart(pw.mp)
 		} else {
-			bsr.MustInitFromFilePart(pw.p.path)
+			bsr.MustInitFromFilePart(fs, pw.p.path)
 		}
 		bsrs = append(bsrs, bsr)
 	}
@@ -1341,7 +1342,7 @@ func (tb *Table) mergePartsInternal(dstPartPath string, bsw *blockStreamWriter, 
 		return nil, fmt.Errorf("cannot merge %d parts to %s: %w", len(bsrs), dstPartPath, err)
 	}
 	if dstPartPath != "" {
-		ph.MustWriteMetadata(dstPartPath)
+		ph.MustWriteMetadata(tb.fs, dstPartPath)
 	}
 	return &ph, nil
 }
@@ -1355,7 +1356,7 @@ func (tb *Table) openCreatedPart(pws []*partWrapper, mpNew *inmemoryPart, dstPar
 		return pwNew
 	}
 	// Open the created part from disk.
-	pNew := mustOpenFilePart(dstPartPath)
+	pNew := mustOpenFilePart(tb.fs, dstPartPath)
 	pwNew := &partWrapper{
 		p: pNew,
 	}
@@ -1398,7 +1399,7 @@ func (tb *Table) swapSrcWithDstParts(pws []*partWrapper, pwNew *partWrapper, dst
 	// This must be performed under partsLock in order to prevent from races
 	// when multiple concurrently running goroutines update the list.
 	if removedFileParts > 0 || dstPartType == partFile {
-		mustWritePartNames(tb.fileParts, tb.path)
+		mustWritePartNames(tb.fs, tb.fileParts, tb.path)
 	}
 
 	tb.partsLock.Unlock()
@@ -1426,7 +1427,7 @@ func (tb *Table) swapSrcWithDstParts(pws []*partWrapper, pwNew *partWrapper, dst
 	// so they are eventually closed and deleted.
 	for _, pw := range pws {
 		pw.mustDrop.Store(true)
-		pw.decRef()
+		pw.decRef(tb.fs)
 	}
 }
 
@@ -1480,7 +1481,7 @@ func (tb *Table) nextMergeIdx() uint64 {
 	return tb.mergeIdx.Add(1)
 }
 
-func mustOpenParts(path string) []*partWrapper {
+func mustOpenParts(fs objectstorage.FS, path string) []*partWrapper {
 	// The path can be missing after restoring from backup, so create it if needed.
 	fs.MustMkdirIfNotExist(path)
 
@@ -1490,7 +1491,7 @@ func mustOpenParts(path string) []*partWrapper {
 	fs.MustRemoveDir(filepath.Join(path, "tmp"))
 
 	partsFile := filepath.Join(path, partsFilename)
-	partNames := mustReadPartNames(partsFile, path)
+	partNames := mustReadPartNames(fs, partsFile, path)
 
 	// Remove dirs missing in partNames. These dirs may be left after unclean shutdown
 	// or after the update from versions prior to v1.90.0.
@@ -1528,7 +1529,7 @@ func mustOpenParts(path string) []*partWrapper {
 	var pws []*partWrapper
 	for _, partName := range partNames {
 		partPath := filepath.Join(path, partName)
-		p := mustOpenFilePart(partPath)
+		p := mustOpenFilePart(fs, partPath)
 		pw := &partWrapper{
 			p: p,
 		}
@@ -1539,7 +1540,7 @@ func mustOpenParts(path string) []*partWrapper {
 		// Create parts.json file if it doesn't exist yet.
 		// This should protect from possible carshloops just after the migration from versions below v1.90.0
 		// See https://github.com/VictoriaMetrics/VictoriaMetrics/issues/4336
-		mustWritePartNames(pws, path)
+		mustWritePartNames(fs, pws, path)
 	}
 
 	return pws
@@ -1575,13 +1576,13 @@ func (tb *Table) MustCreateSnapshotAt(dstDir string) {
 	// Flush inmemory items to disk.
 	tb.flushInmemoryItemsToFiles()
 
-	fs.MustMkdirFailIfExist(dstDir)
+	tb.fs.MustMkdirFailIfExist(dstDir)
 
 	pws := tb.getParts(nil)
 	defer tb.putParts(pws)
 
 	// Create a file with part names at dstDir
-	mustWritePartNames(pws, dstDir)
+	mustWritePartNames(tb.fs, pws, dstDir)
 
 	// Make hardlinks for pws at dstDir
 	for _, pw := range pws {
@@ -1591,17 +1592,17 @@ func (tb *Table) MustCreateSnapshotAt(dstDir string) {
 		}
 		srcPartPath := pw.p.path
 		dstPartPath := filepath.Join(dstDir, filepath.Base(srcPartPath))
-		fs.MustHardLinkFiles(srcPartPath, dstPartPath)
+		tb.fs.MustHardLinkFiles(srcPartPath, dstPartPath)
 	}
 
-	fs.MustSyncPath(dstDir)
+	tb.fs.MustSyncPath(dstDir)
 	parentDir := filepath.Dir(dstDir)
-	fs.MustSyncPath(parentDir)
+	tb.fs.MustSyncPath(parentDir)
 
 	logger.Infof("created Table snapshot of %q at %q in %.3f seconds", srcDir, dstDir, time.Since(startTime).Seconds())
 }
 
-func mustWritePartNames(pws []*partWrapper, dstDir string) {
+func mustWritePartNames(fs objectstorage.FS, pws []*partWrapper, dstDir string) {
 	partNames := make([]string, 0, len(pws))
 	for _, pw := range pws {
 		if pw.mp != nil {
@@ -1620,9 +1621,9 @@ func mustWritePartNames(pws []*partWrapper, dstDir string) {
 	fs.MustWriteAtomic(partsFile, data, true)
 }
 
-func mustReadPartNames(partsFile, srcDir string) []string {
+func mustReadPartNames(fs objectstorage.FS, partsFile, srcDir string) []string {
 	if fs.IsPathExist(partsFile) {
-		data, err := os.ReadFile(partsFile)
+		data, err := fs.ReadFile(partsFile)
 		if err != nil {
 			logger.Panicf("FATAL: cannot read %q: %s", partsFile, err)
 		}

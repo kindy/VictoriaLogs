@@ -9,8 +9,9 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/bytesutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/encoding"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	libfs "github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 type blockStreamReader struct {
@@ -138,12 +139,12 @@ func (bsr *blockStreamReader) MustInitFromInmemoryPart(mp *inmemoryPart) {
 //
 // Part files are read without OS cache pollution, since the part is usually
 // deleted after the merge.
-func (bsr *blockStreamReader) MustInitFromFilePart(path string) {
+func (bsr *blockStreamReader) MustInitFromFilePart(fs objectstorage.FS, path string) {
 	bsr.reset()
 
 	path = filepath.Clean(path)
 
-	bsr.ph.MustReadMetadata(path)
+	bsr.ph.MustReadMetadata(fs, path)
 
 	metaindexPath := filepath.Join(path, metaindexFilename)
 	metaindexFile := filestream.MustOpen(metaindexPath, true)
@@ -180,12 +181,12 @@ func (bsr *blockStreamReader) MustClose() {
 	if !bsr.isInmemoryBlock {
 		// Close files in parallel in order to speed up this process on storage systems with high latency
 		// such as NFS or Ceph.
-		cs := []fs.MustCloser{
+		cs := []libfs.MustCloser{
 			bsr.indexReader,
 			bsr.itemsReader,
 			bsr.lensReader,
 		}
-		fs.MustCloseParallel(cs)
+		libfs.MustCloseParallel(cs)
 	}
 	bsr.reset()
 }
@@ -225,10 +226,10 @@ func (bsr *blockStreamReader) Next() bool {
 	bsr.bhIdx++
 
 	bsr.sb.itemsData = bytesutil.ResizeNoCopyMayOverallocate(bsr.sb.itemsData, int(bsr.bh.itemsBlockSize))
-	fs.MustReadData(bsr.itemsReader, bsr.sb.itemsData)
+	libfs.MustReadData(bsr.itemsReader, bsr.sb.itemsData)
 
 	bsr.sb.lensData = bytesutil.ResizeNoCopyMayOverallocate(bsr.sb.lensData, int(bsr.bh.lensBlockSize))
-	fs.MustReadData(bsr.lensReader, bsr.sb.lensData)
+	libfs.MustReadData(bsr.lensReader, bsr.sb.lensData)
 
 	if err := bsr.Block.UnmarshalData(&bsr.sb, bsr.bh.firstItem, bsr.bh.commonPrefix, bsr.bh.itemsCount, bsr.bh.marshalType); err != nil {
 		bsr.err = fmt.Errorf("cannot unmarshal inmemoryBlock from storageBlock with firstItem=%X, commonPrefix=%X, itemsCount=%d, marshalType=%d: %w",
@@ -268,7 +269,7 @@ func (bsr *blockStreamReader) readNextBHS() error {
 
 	// Read compressed index block.
 	bsr.packedBuf = bytesutil.ResizeNoCopyMayOverallocate(bsr.packedBuf, int(mr.indexBlockSize))
-	fs.MustReadData(bsr.indexReader, bsr.packedBuf)
+	libfs.MustReadData(bsr.indexReader, bsr.packedBuf)
 
 	// Unpack the compressed index block.
 	var err error

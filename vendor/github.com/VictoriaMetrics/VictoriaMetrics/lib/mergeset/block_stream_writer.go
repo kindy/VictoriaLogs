@@ -6,7 +6,8 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/encoding"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	libfs "github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 type blockStreamWriter struct {
@@ -73,7 +74,7 @@ func (bsw *blockStreamWriter) MustInitFromInmemoryPart(mp *inmemoryPart, compres
 // MustInitFromFilePart initializes bsw from a file-based part on the given path.
 //
 // The bsw doesn't pollute OS page cache if nocache is set.
-func (bsw *blockStreamWriter) MustInitFromFilePart(path string, nocache bool, compressLevel int) {
+func (bsw *blockStreamWriter) MustInitFromFilePart(fs objectstorage.FS, path string, nocache bool, compressLevel int) {
 	bsw.reset()
 	bsw.compressLevel = compressLevel
 
@@ -112,17 +113,17 @@ func (bsw *blockStreamWriter) MustClose() {
 
 	// Compress and write metaindex.
 	bsw.packedMetaindexBuf = encoding.CompressZSTDLevel(bsw.packedMetaindexBuf[:0], bsw.unpackedMetaindexBuf, bsw.compressLevel)
-	fs.MustWriteData(bsw.metaindexWriter, bsw.packedMetaindexBuf)
+	libfs.MustWriteData(bsw.metaindexWriter, bsw.packedMetaindexBuf)
 
 	// Close writers in parallel in order to reduce the time needed for closing them
 	// on high-latency storage systems such as NFS or Ceph.
-	cs := []fs.MustCloser{
+	cs := []libfs.MustCloser{
 		bsw.metaindexWriter,
 		bsw.indexWriter,
 		bsw.itemsWriter,
 		bsw.lensWriter,
 	}
-	fs.MustCloseParallel(cs)
+	libfs.MustCloseParallel(cs)
 
 	bsw.reset()
 }
@@ -134,13 +135,13 @@ func (bsw *blockStreamWriter) WriteBlock(ib *inmemoryBlock) {
 	bsw.bh.firstItem, bsw.bh.commonPrefix, bsw.bh.itemsCount, bsw.bh.marshalType = ib.MarshalSortedData(&bsw.sb, bsw.bh.firstItem[:0], bsw.bh.commonPrefix[:0], bsw.compressLevel)
 
 	// Write itemsData
-	fs.MustWriteData(bsw.itemsWriter, bsw.sb.itemsData)
+	libfs.MustWriteData(bsw.itemsWriter, bsw.sb.itemsData)
 	bsw.bh.itemsBlockSize = uint32(len(bsw.sb.itemsData))
 	bsw.bh.itemsBlockOffset = bsw.itemsBlockOffset
 	bsw.itemsBlockOffset += uint64(bsw.bh.itemsBlockSize)
 
 	// Write lensData
-	fs.MustWriteData(bsw.lensWriter, bsw.sb.lensData)
+	libfs.MustWriteData(bsw.lensWriter, bsw.sb.lensData)
 	bsw.bh.lensBlockSize = uint32(len(bsw.sb.lensData))
 	bsw.bh.lensBlockOffset = bsw.lensBlockOffset
 	bsw.lensBlockOffset += uint64(bsw.bh.lensBlockSize)
@@ -173,7 +174,7 @@ func (bsw *blockStreamWriter) flushIndexData() {
 
 	// Write indexBlock.
 	bsw.packedIndexBlockBuf = encoding.CompressZSTDLevel(bsw.packedIndexBlockBuf[:0], bsw.unpackedIndexBlockBuf, bsw.compressLevel)
-	fs.MustWriteData(bsw.indexWriter, bsw.packedIndexBlockBuf)
+	libfs.MustWriteData(bsw.indexWriter, bsw.packedIndexBlockBuf)
 	bsw.mr.indexBlockSize = uint32(len(bsw.packedIndexBlockBuf))
 	bsw.mr.indexBlockOffset = bsw.indexBlockOffset
 	bsw.indexBlockOffset += uint64(bsw.mr.indexBlockSize)

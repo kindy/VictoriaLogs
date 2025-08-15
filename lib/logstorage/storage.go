@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/cgroup"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/timeutil"
 )
 
@@ -88,8 +88,8 @@ type Storage struct {
 	rowsDroppedTooBigTimestamp   atomic.Uint64
 	rowsDroppedTooSmallTimestamp atomic.Uint64
 
-	// path is the path to the Storage directory
-	path string
+	// fs is a storage filesystem implementation
+	fs objectstorage.FS
 
 	// retention is the retention for the stored data
 	//
@@ -188,9 +188,8 @@ func (s *Storage) PartitionAttach(name string) error {
 	}
 
 	// Open the partition and add it to the s.partitions.
-	partitionsPath := filepath.Join(s.path, partitionsDirname)
-	partitionPath := filepath.Join(partitionsPath, name)
-	if !fs.IsPathExist(partitionPath) {
+	partitionPath := filepath.Join(partitionsDirname, name)
+	if !s.fs.IsPathExist(partitionPath) {
 		return fmt.Errorf("cannot attach the partition %q, because there is no the corresponding directory %q", name, partitionPath)
 	}
 
@@ -293,13 +292,14 @@ func (ptw *partitionWrapper) decRef() {
 		deletePath = ptw.pt.path
 	}
 
+	fs := ptw.pt.s.fs
 	// Close pw.pt, since nobody refers to it.
 	mustClosePartition(ptw.pt)
 	ptw.pt = nil
 
 	// Delete partition if needed.
 	if deletePath != "" {
-		mustDeletePartition(deletePath)
+		mustDeletePartition(fs, deletePath)
 	}
 
 	// signal that the ptw is no longer accessed.
@@ -318,7 +318,7 @@ func (ptw *partitionWrapper) canAddAllRows(lr *LogRows) bool {
 }
 
 // mustCreateStorage creates Storage at the given path.
-func mustCreateStorage(path string) {
+func mustCreateStorage(fs objectstorage.FS, path string) {
 	fs.MustMkdirFailIfExist(path)
 
 	partitionsPath := filepath.Join(path, partitionsDirname)
@@ -349,18 +349,19 @@ func MustOpenStorage(path string, cfg *StorageConfig) *Storage {
 		minFreeDiskSpaceBytes = uint64(cfg.MinFreeDiskSpaceBytes)
 	}
 
+	fs := objectstorage.New(path)
 	if !fs.IsPathExist(path) {
-		mustCreateStorage(path)
+		mustCreateStorage(fs, path)
 	}
 
-	flockF := fs.MustCreateFlockFile(path)
+	flockF := fs.MustCreateFlockFile()
 
 	// Load caches
 	streamIDCache := newCache()
 	filterStreamCache := newCache()
 
 	s := &Storage{
-		path:                   path,
+		fs:                     fs,
 		retention:              retention,
 		maxDiskSpaceUsageBytes: cfg.MaxDiskSpaceUsageBytes,
 		maxDiskUsagePercent:    cfg.MaxDiskUsagePercent,
@@ -376,9 +377,8 @@ func MustOpenStorage(path string, cfg *StorageConfig) *Storage {
 		filterStreamCache: filterStreamCache,
 	}
 
-	partitionsPath := filepath.Join(path, partitionsDirname)
-	fs.MustMkdirIfNotExist(partitionsPath)
-	des := fs.MustReadDir(partitionsPath)
+	fs.MustMkdirIfNotExist(partitionsDirname)
+	des := fs.MustReadDir(partitionsDirname)
 	ptws := make([]*partitionWrapper, len(des))
 
 	// Open partitions in parallel. This should improve VictoriaLogs initialization duration
@@ -388,7 +388,7 @@ func MustOpenStorage(path string, cfg *StorageConfig) *Storage {
 	for i, de := range des {
 		fname := de.Name()
 
-		partitionDir := filepath.Join(partitionsPath, fname)
+		partitionDir := filepath.Join(partitionsDirname, fname)
 		if fs.IsPartiallyRemovedDir(partitionDir) {
 			// Drop partially removed partition directory. This may happen when unclean shutdown happens during partition deletion.
 			fs.MustRemoveDir(partitionDir)
@@ -405,10 +405,10 @@ func MustOpenStorage(path string, cfg *StorageConfig) *Storage {
 
 			day, err := getPartitionDayFromName(fname)
 			if err != nil {
-				logger.Panicf("FATAL: cannot parse partition filename %q at %q: %s", fname, partitionsPath, err)
+				logger.Panicf("FATAL: cannot parse partition filename %q at %q: %s", fname, partitionsDirname, err)
 			}
 
-			partitionPath := filepath.Join(partitionsPath, fname)
+			partitionPath := filepath.Join(partitionsDirname, fname)
 			pt := mustOpenPartition(s, partitionPath)
 			ptws[idx] = newPartitionWrapper(pt, day)
 		}(i)
@@ -526,7 +526,7 @@ func (s *Storage) watchMaxDiskSpaceUsage() {
 		if s.maxDiskSpaceUsageBytes > 0 {
 			limitBytes = uint64(s.maxDiskSpaceUsageBytes)
 		} else if s.maxDiskUsagePercent > 0 {
-			total := fs.MustGetTotalSpace(s.path)
+			total := s.fs.MustGetTotalSpace()
 			if total > 0 {
 				limitBytes = (total * uint64(s.maxDiskUsagePercent)) / 100
 			}
@@ -643,10 +643,10 @@ func (s *Storage) MustClose() {
 	s.filterStreamCache = nil
 
 	// release lock file
-	fs.MustClose(s.flockF)
+	s.fs.MustClose(s.flockF)
 	s.flockF = nil
 
-	s.path = ""
+	s.fs = nil
 }
 
 // MustForceMerge force-merges parts in s partitions with names starting from the given partitionNamePrefix.
@@ -799,14 +799,14 @@ func (s *Storage) getPartitionForWriting(day int64) *partitionWrapper {
 		}
 
 		fname := getPartitionNameFromDay(day)
-		partitionPath := filepath.Join(s.path, partitionsDirname, fname)
-		if fs.IsPathExist(partitionPath) {
+		partitionPath := filepath.Join(partitionsDirname, fname)
+		if s.fs.IsPathExist(partitionPath) {
 			// The partition directory exists. This can happen in the following cases:
 			// - When the partition directory has been manually added, but it wasn't attached yet via Storage.PartitionAttach().
 			// - When the partition has been detached via Storage.PartitionDetach().
 			return nil
 		}
-		mustCreatePartition(partitionPath)
+		mustCreatePartition(s.fs, partitionPath)
 
 		pt := mustOpenPartition(s, partitionPath)
 		ptw = newPartitionWrapper(pt, day)
@@ -832,7 +832,7 @@ func (s *Storage) UpdateStats(ss *StorageStats) {
 	if s.maxDiskSpaceUsageBytes > 0 {
 		ss.MaxDiskSpaceUsageBytes = s.maxDiskSpaceUsageBytes
 	} else {
-		ss.MaxDiskSpaceUsageBytes = int64(fs.MustGetTotalSpace(s.path) * uint64(s.maxDiskUsagePercent) / 100)
+		ss.MaxDiskSpaceUsageBytes = int64(s.fs.MustGetTotalSpace() * uint64(s.maxDiskUsagePercent) / 100)
 	}
 
 	s.partitionsLock.Lock()
@@ -847,7 +847,7 @@ func (s *Storage) UpdateStats(ss *StorageStats) {
 
 // IsReadOnly returns true if s is in read-only mode.
 func (s *Storage) IsReadOnly() bool {
-	available := fs.MustGetFreeSpace(s.path)
+	available := s.fs.MustGetFreeSpace()
 	return available < s.minFreeDiskSpaceBytes
 }
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestStorageLifecycle(t *testing.T) {
@@ -17,6 +17,7 @@ func TestStorageLifecycle(t *testing.T) {
 		s := MustOpenStorage(path, cfg)
 		s.MustClose()
 	}
+	fs := objectstorage.New(t.Name())
 	fs.MustRemoveDir(path)
 }
 
@@ -102,7 +103,7 @@ func TestStorageMustAddRows(t *testing.T) {
 	if n := sStats.RowsCount(); n != totalRowsCount {
 		t.Fatalf("unexpected number of entries in storage; got %d; want %d", n, totalRowsCount)
 	}
+	fs := s.fs
 	s.MustClose()
-
 	fs.MustRemoveDir(path)
 }

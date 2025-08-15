@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
-
 	"github.com/VictoriaMetrics/VictoriaLogs/lib/prefixfilter"
 )
 
@@ -932,9 +930,10 @@ func TestStorageRunQuery(t *testing.T) {
 		})
 	})
 
+	fs := s.fs
 	// Close the storage and delete its data
 	s.MustClose()
-	fs.MustRemoveDir(path)
+	fs.MustRemoveDir("")
 }
 
 func mustParseQuery(query string) *Query {
@@ -1237,8 +1236,9 @@ func TestStorageSearch(t *testing.T) {
 		s.search(workersCount, so, ss, nil, processBlock)
 	})
 
+	fs := s.fs
 	s.MustClose()
-	fs.MustRemoveDir(path)
+	fs.MustRemoveDir("")
 }
 
 func TestParseStreamFieldsSuccess(t *testing.T) {

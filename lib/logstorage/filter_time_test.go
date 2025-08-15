@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestFilterTime(t *testing.T) {
@@ -93,6 +93,7 @@ func testFilterMatchForTimestamps(t *testing.T, timestamps []int64, f filter, ex
 
 	// Create the test storage
 	storagePath := t.Name()
+	fs := objectstorage.New(storagePath)
 	cfg := &StorageConfig{
 		Retention: 100 * 365 * time.Duration(nsecsPerDay),
 	}
@@ -119,7 +120,7 @@ func testFilterMatchForTimestamps(t *testing.T, timestamps []int64, f filter, ex
 
 	// Close and delete the test storage
 	s.MustClose()
-	fs.MustRemoveDir(storagePath)
+	fs.MustRemoveDir("")
 }
 
 func generateRowsFromTimestamps(s *Storage, tenantID TenantID, timestamps []int64, getValue func(rowIdx int) string) {

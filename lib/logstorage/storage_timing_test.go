@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 )
 
 func BenchmarkStorageMustAddRows(b *testing.B) {
@@ -40,6 +38,7 @@ func benchmarkStorageMustAddRows(b *testing.B, rowsPerInsert int) {
 		}
 	})
 
+	fs := s.fs
 	s.MustClose()
-	fs.MustRemoveDir(testName)
+	fs.MustRemoveDir("")
 }

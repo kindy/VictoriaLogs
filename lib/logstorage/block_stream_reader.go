@@ -8,8 +8,9 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/bytesutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	libfs "github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/slicesutil"
 )
 
@@ -36,7 +37,7 @@ func (r *readerWithStats) Path() string {
 
 // MustReadFull reads len(data) to r.
 func (r *readerWithStats) MustReadFull(data []byte) {
-	fs.MustReadData(r.r, data)
+	libfs.MustReadData(r.r, data)
 	r.bytesRead += uint64(len(data))
 }
 
@@ -95,7 +96,7 @@ func (r *bloomValuesReader) totalBytesRead() uint64 {
 	return r.bloom.bytesRead + r.values.bytesRead
 }
 
-func (r *bloomValuesReader) appendClosers(dst []fs.MustCloser) []fs.MustCloser {
+func (r *bloomValuesReader) appendClosers(dst []libfs.MustCloser) []libfs.MustCloser {
 	dst = append(dst, &r.bloom)
 	dst = append(dst, &r.values)
 	return dst
@@ -181,7 +182,7 @@ func (sr *streamReaders) totalBytesRead() uint64 {
 func (sr *streamReaders) MustClose() {
 	// Close files in parallel in order to reduce the time needed for this operation
 	// on high-latency storage systems such as NFS or Ceph.
-	cs := []fs.MustCloser{
+	cs := []libfs.MustCloser{
 		&sr.columnNamesReader,
 		&sr.columnIdxsReader,
 		&sr.metaindexReader,
@@ -197,7 +198,7 @@ func (sr *streamReaders) MustClose() {
 		cs = sr.bloomValuesShards[i].appendClosers(cs)
 	}
 
-	fs.MustCloseParallel(cs)
+	libfs.MustCloseParallel(cs)
 }
 
 func (sr *streamReaders) getBloomValuesReaderForColumnName(name string) *bloomValuesReader {
@@ -306,7 +307,7 @@ func (bsr *blockStreamReader) Path() string {
 }
 
 // MustInitFromInmemoryPart initializes bsr from mp.
-func (bsr *blockStreamReader) MustInitFromInmemoryPart(mp *inmemoryPart) {
+func (bsr *blockStreamReader) MustInitFromInmemoryPart(fs objectstorage.FS, mp *inmemoryPart) {
 	bsr.reset()
 
 	bsr.ph = mp.ph
@@ -335,14 +336,14 @@ func (bsr *blockStreamReader) MustInitFromInmemoryPart(mp *inmemoryPart) {
 }
 
 // MustInitFromFilePart initializes bsr from file part at the given path.
-func (bsr *blockStreamReader) MustInitFromFilePart(path string) {
+func (bsr *blockStreamReader) MustInitFromFilePart(fs objectstorage.FS, path string) {
 	bsr.reset()
 
 	// Files in the part are always read without OS cache pollution,
 	// since they are usually deleted after the merge.
 	const nocache = true
 
-	bsr.ph.mustReadMetadata(path)
+	bsr.ph.mustReadMetadata(fs, path)
 
 	columnNamesPath := filepath.Join(path, columnNamesFilename)
 	columnIdxsPath := filepath.Join(path, columnIdxsFilename)

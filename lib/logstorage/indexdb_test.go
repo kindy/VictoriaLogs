@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
-
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 )
 
 func TestStorageSearchStreamIDs(t *testing.T) {
@@ -13,8 +11,9 @@ func TestStorageSearchStreamIDs(t *testing.T) {
 
 	path := t.Name()
 	const partitionName = "foobar"
-	s := newTestStorage()
-	mustCreateIndexdb(path)
+	s := newTestStorage(t)
+	fs := s.fs
+	mustCreateIndexdb(fs, path)
 	idb := mustOpenIndexdb(path, partitionName, s)
 
 	tenantID := TenantID{
@@ -248,7 +247,7 @@ func TestStorageSearchStreamIDs(t *testing.T) {
 	f(`{instance="instance-2",job!="job-1"}`, streamIDs)
 
 	mustCloseIndexdb(idb)
-	fs.MustRemoveDir(path)
+	fs.MustRemoveDir("")
 
 	closeTestStorage(s)
 }

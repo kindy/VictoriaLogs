@@ -27,7 +27,7 @@ func benchmarkInmemoryPartMustInitFromRows(b *testing.B, streams, rowsPerStream 
 
 		mp := getInmemoryPart()
 		for pb.Next() {
-			mp.mustInitFromRows(&lr)
+			mp.mustInitFromRows(nil, &lr)
 			if mp.ph.RowsCount != uint64(len(lr.timestamps)) {
 				panic(fmt.Errorf("unexpected number of entries in the output stream; got %d; want %d", mp.ph.RowsCount, len(lr.timestamps)))
 			}

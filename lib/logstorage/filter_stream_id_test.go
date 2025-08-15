@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 )
 
 func TestFilterStreamID(t *testing.T) {
@@ -79,7 +77,7 @@ func testFilterMatchForStreamID(t *testing.T, f filter, expectedRowIdxs []int) {
 
 	// Close and delete the test storage
 	s.MustClose()
-	fs.MustRemoveDir(storagePath)
+	s.fs.MustRemoveDir("")
 }
 
 func generateTestLogStreams(s *Storage, tenantID TenantID, getMsgValue func(int) string, rowsCount, streamsCount int) {

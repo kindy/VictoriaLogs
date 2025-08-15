@@ -7,7 +7,7 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/chunkedbuffer"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 // inmemoryPart is an in-memory part.
@@ -68,14 +68,14 @@ func (mp *inmemoryPart) reset() {
 }
 
 // mustInitFromRows initializes mp from lr.
-func (mp *inmemoryPart) mustInitFromRows(lr *logRows) {
+func (mp *inmemoryPart) mustInitFromRows(fs objectstorage.FS, lr *logRows) {
 	mp.reset()
 
 	sort.Sort(lr)
 	lr.sortFieldsInRows()
 
 	bsw := getBlockStreamWriter()
-	bsw.MustInitForInmemoryPart(mp)
+	bsw.MustInitForInmemoryPart(fs, mp)
 	trs := getTmpRows()
 	var sidPrev *streamID
 	uncompressedBlockSizeBytes := uint64(0)
@@ -107,7 +107,7 @@ func (mp *inmemoryPart) mustInitFromRows(lr *logRows) {
 }
 
 // MustStoreToDisk stores mp to disk at the given path.
-func (mp *inmemoryPart) MustStoreToDisk(path string) {
+func (mp *inmemoryPart) MustStoreToDisk(fs objectstorage.FS, path string) {
 	fs.MustMkdirFailIfExist(path)
 
 	columnNamesPath := filepath.Join(path, columnNamesFilename)
@@ -141,7 +141,7 @@ func (mp *inmemoryPart) MustStoreToDisk(path string) {
 
 	psw.Run()
 
-	mp.ph.mustWriteMetadata(path)
+	mp.ph.mustWriteMetadata(fs, path)
 
 	// Sync the path contents and the path parent dir in order to guarantee
 	// all the path contents is visible in case of unclean shutdown.

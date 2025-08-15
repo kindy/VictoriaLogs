@@ -13,9 +13,9 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/atomicutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/cgroup"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/memory"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/metrics"
 )
 
@@ -156,19 +156,21 @@ func (pw *partWrapper) decRef() {
 	pw.p = nil
 
 	if deletePath != "" {
+		fs := pw.p.pt.s.fs
 		fs.MustRemoveDir(deletePath)
 	}
 }
 
-func mustCreateDatadb(path string) {
+func mustCreateDatadb(fs objectstorage.FS, path string) {
 	fs.MustMkdirFailIfExist(path)
-	mustWritePartNames(path, nil, nil)
+	mustWritePartNames(fs, path, nil, nil)
 }
 
 // mustOpenDatadb opens datadb at the given path with the given flushInterval for in-memory data.
 func mustOpenDatadb(pt *partition, path string, flushInterval time.Duration) *datadb {
-	partNames := mustReadPartNames(path)
-	mustRemoveUnusedDirs(path, partNames)
+	fs := pt.s.fs
+	partNames := mustReadPartNames(fs, path)
+	mustRemoveUnusedDirs(fs, path, partNames)
 
 	var smallParts []*partWrapper
 	var bigParts []*partWrapper
@@ -495,10 +497,11 @@ func (ddb *datadb) mustMergeParts(pws []*partWrapper, isFinal bool) {
 	startTime := time.Now()
 
 	dstPartType := ddb.getDstPartType(pws, isFinal)
+	fs := ddb.pt.s.fs
 	if dstPartType != partInmemory {
 		// Make sure there is enough disk space for performing the merge
 		partsSize := getCompressedSize(pws)
-		needReleaseDiskSpace := tryReserveDiskSpace(ddb.path, partsSize)
+		needReleaseDiskSpace := tryReserveDiskSpace(fs, partsSize)
 		if needReleaseDiskSpace {
 			defer releaseDiskSpace(partsSize)
 		} else {
@@ -536,7 +539,7 @@ func (ddb *datadb) mustMergeParts(pws []*partWrapper, isFinal bool) {
 	if isFinal && len(pws) == 1 && pws[0].mp != nil {
 		// Fast path: flush a single in-memory part to disk.
 		mp := pws[0].mp
-		mp.MustStoreToDisk(dstPartPath)
+		mp.MustStoreToDisk(fs, dstPartPath)
 		pwNew := ddb.openCreatedPart(&mp.ph, pws, nil, dstPartPath)
 		ddb.swapSrcWithDstParts(pws, pwNew, dstPartType)
 		ddb.updateMergeMetrics(dstPartType, mp.ph.RowsCount, startTime, mp.ph.CompressedSizeBytes)
@@ -560,10 +563,10 @@ func (ddb *datadb) mustMergeParts(pws []*partWrapper, isFinal bool) {
 	var mpNew *inmemoryPart
 	if dstPartType == partInmemory {
 		mpNew = getInmemoryPart()
-		bsw.MustInitForInmemoryPart(mpNew)
+		bsw.MustInitForInmemoryPart(fs, mpNew)
 	} else {
 		nocache := dstPartType == partBig
-		bsw.MustInitForFilePart(dstPartPath, nocache)
+		bsw.MustInitForFilePart(fs, dstPartPath, nocache)
 	}
 
 	// Merge source parts to destination part.
@@ -583,7 +586,7 @@ func (ddb *datadb) mustMergeParts(pws []*partWrapper, isFinal bool) {
 	if mpNew != nil {
 		mpNew.ph = ph
 	} else {
-		ph.mustWriteMetadata(dstPartPath)
+		ph.mustWriteMetadata(fs, dstPartPath)
 		// Make sure the created part directory contents is synced and visible in case of unclean shutdown.
 		fs.MustSyncPathAndParentDir(dstPartPath)
 	}
@@ -678,6 +681,7 @@ func (ddb *datadb) getDstPartPath(dstPartType partType, mergeIdx uint64) string 
 }
 
 func (ddb *datadb) openCreatedPart(ph *partHeader, pws []*partWrapper, mpNew *inmemoryPart, dstPartPath string) *partWrapper {
+	fs := ddb.pt.s.fs
 	// Open the created part.
 	if ph.RowsCount == 0 {
 		// The created part is empty. Remove it
@@ -803,7 +807,8 @@ func (shard *rowsBufferShard) flushLocked() {
 func (ddb *datadb) mustFlushLogRows(lr *logRows) {
 	inmemoryPartsConcurrencyCh <- struct{}{}
 	mp := getInmemoryPart()
-	mp.mustInitFromRows(lr)
+	fs := ddb.pt.s.fs
+	mp.mustInitFromRows(fs, lr)
 	p := mustOpenInmemoryPart(ddb.pt, mp)
 	<-inmemoryPartsConcurrencyCh
 
@@ -983,7 +988,8 @@ func (ddb *datadb) swapSrcWithDstParts(pws []*partWrapper, pwNew *partWrapper, d
 	if removedSmallParts > 0 || removedBigParts > 0 || pwNew != nil && dstPartType != partInmemory {
 		smallPartNames := getPartNames(ddb.smallParts)
 		bigPartNames := getPartNames(ddb.bigParts)
-		mustWritePartNames(ddb.path, smallPartNames, bigPartNames)
+		fs := ddb.pt.s.fs
+		mustWritePartNames(fs, ddb.path, smallPartNames, bigPartNames)
 	}
 
 	ddb.partsLock.Unlock()
@@ -1027,11 +1033,12 @@ func removeParts(pws []*partWrapper, partsToRemove map[*partWrapper]struct{}) ([
 func mustOpenBlockStreamReaders(pws []*partWrapper) []*blockStreamReader {
 	bsrs := make([]*blockStreamReader, 0, len(pws))
 	for _, pw := range pws {
+		fs := pw.p.pt.s.fs
 		bsr := getBlockStreamReader()
 		if pw.mp != nil {
-			bsr.MustInitFromInmemoryPart(pw.mp)
+			bsr.MustInitFromInmemoryPart(fs, pw.mp)
 		} else {
-			bsr.MustInitFromFilePart(pw.p.path)
+			bsr.MustInitFromFilePart(fs, pw.p.path)
 		}
 		bsrs = append(bsrs, bsr)
 	}
@@ -1093,7 +1100,7 @@ func (ddb *datadb) releasePartsToMerge(pws []*partWrapper) {
 }
 
 func (ddb *datadb) getMaxBigPartSize() uint64 {
-	return getMaxOutBytes(ddb.path)
+	return getMaxOutBytes(ddb.pt.s.fs, ddb.path)
 }
 
 func (ddb *datadb) getMaxSmallPartSize() uint64 {
@@ -1105,23 +1112,23 @@ func (ddb *datadb) getMaxSmallPartSize() uint64 {
 		n = 10e6
 	}
 	// Make sure the output part fits available disk space for small parts.
-	sizeLimit := getMaxOutBytes(ddb.path)
+	sizeLimit := getMaxOutBytes(ddb.pt.s.fs, ddb.path)
 	if n > sizeLimit {
 		n = sizeLimit
 	}
 	return n
 }
 
-func getMaxOutBytes(path string) uint64 {
-	n := availableDiskSpace(path)
+func getMaxOutBytes(fs objectstorage.FS, path string) uint64 {
+	n := availableDiskSpace(fs)
 	if n > maxBigPartSize {
 		n = maxBigPartSize
 	}
 	return n
 }
 
-func availableDiskSpace(path string) uint64 {
-	available := fs.MustGetFreeSpace(path)
+func availableDiskSpace(fs objectstorage.FS) uint64 {
+	available := fs.MustGetFreeSpace()
 	reserved := reservedDiskSpace.Load()
 	if available < reserved {
 		return 0
@@ -1129,8 +1136,8 @@ func availableDiskSpace(path string) uint64 {
 	return available - reserved
 }
 
-func tryReserveDiskSpace(path string, n uint64) bool {
-	available := fs.MustGetFreeSpace(path)
+func tryReserveDiskSpace(fs objectstorage.FS, n uint64) bool {
+	available := fs.MustGetFreeSpace()
 	reserved := reserveDiskSpace(n)
 	if available >= reserved {
 		return true
@@ -1220,7 +1227,7 @@ func getPartNames(pws []*partWrapper) []string {
 	return partNames
 }
 
-func mustWritePartNames(path string, smallPartNames, bigPartNames []string) {
+func mustWritePartNames(fs objectstorage.FS, path string, smallPartNames, bigPartNames []string) {
 	partNames := append([]string{}, smallPartNames...)
 	partNames = append(partNames, bigPartNames...)
 	data, err := json.Marshal(partNames)
@@ -1231,9 +1238,9 @@ func mustWritePartNames(path string, smallPartNames, bigPartNames []string) {
 	fs.MustWriteAtomic(partNamesPath, data, true)
 }
 
-func mustReadPartNames(path string) []string {
+func mustReadPartNames(fs objectstorage.FS, path string) []string {
 	partNamesPath := filepath.Join(path, partsFilename)
-	data, err := os.ReadFile(partNamesPath)
+	data, err := fs.ReadFile(partNamesPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// The parts.json file is missing. This can happen if VictoriaLogs shuts down uncleanly
@@ -1251,7 +1258,7 @@ func mustReadPartNames(path string) []string {
 
 			if len(partDirs) == 0 {
 				logger.Warnf("creating missing %s with empty parts list, since no part directories found in %s", partNamesPath, path)
-				mustWritePartNames(path, nil, nil)
+				mustWritePartNames(fs, path, nil, nil)
 				return []string{}
 			}
 
@@ -1272,7 +1279,7 @@ func mustReadPartNames(path string) []string {
 // mustRemoveUnusedDirs removes dirs at path, which are missing in partNames.
 //
 // These dirs may be left after unclean shutdown.
-func mustRemoveUnusedDirs(path string, partNames []string) {
+func mustRemoveUnusedDirs(fs objectstorage.FS, path string, partNames []string) {
 	des := fs.MustReadDir(path)
 	m := make(map[string]struct{}, len(partNames))
 	for _, partName := range partNames {

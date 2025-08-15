@@ -4,11 +4,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 type partHeader struct {
@@ -78,12 +77,12 @@ func (ph *partHeader) CopyFrom(src *partHeader) {
 	ph.lastItem = append(ph.lastItem[:0], src.lastItem...)
 }
 
-func (ph *partHeader) MustReadMetadata(partPath string) {
+func (ph *partHeader) MustReadMetadata(fs objectstorage.FS, partPath string) {
 	ph.Reset()
 
 	// Read ph fields from metadata.
 	metadataPath := filepath.Join(partPath, metadataFilename)
-	metadata, err := os.ReadFile(metadataPath)
+	metadata, err := fs.ReadFile(metadataPath)
 	if err != nil {
 		logger.Panicf("FATAL: cannot read %q: %s", metadataPath, err)
 	}
@@ -111,7 +110,7 @@ func (ph *partHeader) MustReadMetadata(partPath string) {
 	ph.lastItem = append(ph.lastItem[:0], phj.LastItem...)
 }
 
-func (ph *partHeader) MustWriteMetadata(partPath string) {
+func (ph *partHeader) MustWriteMetadata(fs objectstorage.FS, partPath string) {
 	phj := &partHeaderJSON{
 		ItemsCount:  ph.itemsCount,
 		BlocksCount: ph.blocksCount,

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/timerpool"
 )
 
@@ -14,9 +15,9 @@ func TestPartitionLifecycle(t *testing.T) {
 	path := t.Name()
 	var ddbStats DatadbStats
 
-	s := newTestStorage()
+	s := newTestStorage(t)
 	for i := 0; i < 3; i++ {
-		mustCreatePartition(path)
+		mustCreatePartition(s.fs, path)
 		for j := 0; j < 2; j++ {
 			pt := mustOpenPartition(s, path)
 			ddbStats.reset()
@@ -45,7 +46,7 @@ func TestPartitionLifecycle(t *testing.T) {
 			time.Sleep(10 * time.Millisecond)
 			mustClosePartition(pt)
 		}
-		mustDeletePartition(path)
+		mustDeletePartition(s.fs, path)
 	}
 	closeTestStorage(s)
 }
@@ -56,8 +57,8 @@ func TestPartitionMustAddRowsSerial(t *testing.T) {
 	path := t.Name()
 	var ddbStats DatadbStats
 
-	s := newTestStorage()
-	mustCreatePartition(path)
+	s := newTestStorage(t)
+	mustCreatePartition(s.fs, path)
 	pt := mustOpenPartition(s, path)
 
 	// Try adding the same entry at a time.
@@ -135,7 +136,7 @@ func TestPartitionMustAddRowsSerial(t *testing.T) {
 	}
 
 	mustClosePartition(pt)
-	mustDeletePartition(path)
+	mustDeletePartition(s.fs, path)
 
 	closeTestStorage(s)
 }
@@ -144,9 +145,9 @@ func TestPartitionMustAddRowsConcurrent(t *testing.T) {
 	t.Parallel()
 
 	path := t.Name()
-	s := newTestStorage()
+	s := newTestStorage(t)
 
-	mustCreatePartition(path)
+	mustCreatePartition(s.fs, path)
 	pt := mustOpenPartition(s, path)
 
 	const workersCount = 3
@@ -180,7 +181,7 @@ func TestPartitionMustAddRowsConcurrent(t *testing.T) {
 	}
 
 	mustClosePartition(pt)
-	mustDeletePartition(path)
+	mustDeletePartition(s.fs, path)
 
 	closeTestStorage(s)
 }
@@ -188,13 +189,15 @@ func TestPartitionMustAddRowsConcurrent(t *testing.T) {
 // newTestStorage creates new storage for tests.
 //
 // When the storage is no longer needed, closeTestStorage() must be called.
-func newTestStorage() *Storage {
+func newTestStorage(t *testing.T) *Storage {
 	streamIDCache := newCache()
 	filterStreamCache := newCache()
+	fs := objectstorage.New(t.Name())
 	return &Storage{
 		flushInterval:     time.Second,
 		streamIDCache:     streamIDCache,
 		filterStreamCache: filterStreamCache,
+		fs:                fs,
 	}
 }
 

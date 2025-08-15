@@ -3,13 +3,12 @@ package logstorage
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 // partHeader contains the information about a single part
@@ -59,11 +58,11 @@ func (ph *partHeader) String() string {
 		timestampToString(ph.MinTimestamp), timestampToString(ph.MaxTimestamp), ph.BloomValuesShardsCount)
 }
 
-func (ph *partHeader) mustReadMetadata(partPath string) {
+func (ph *partHeader) mustReadMetadata(fs objectstorage.FS, partPath string) {
 	ph.reset()
 
 	metadataPath := filepath.Join(partPath, metadataFilename)
-	metadata, err := os.ReadFile(metadataPath)
+	metadata, err := fs.ReadFile(metadataPath)
 	if err != nil {
 		logger.Panicf("FATAL: cannot read %q: %s", metadataPath, err)
 	}
@@ -92,7 +91,7 @@ func (ph *partHeader) mustReadMetadata(partPath string) {
 	}
 }
 
-func (ph *partHeader) mustWriteMetadata(partPath string) {
+func (ph *partHeader) mustWriteMetadata(fs objectstorage.FS, partPath string) {
 	metadata, err := json.Marshal(ph)
 	if err != nil {
 		logger.Panicf("BUG: cannot marshal partHeader: %s", err)

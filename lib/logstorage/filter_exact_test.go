@@ -3,7 +3,7 @@ package logstorage
 import (
 	"testing"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestFilterExact(t *testing.T) {
@@ -643,6 +643,7 @@ func TestFilterExact(t *testing.T) {
 		testFilterMatchForColumns(t, columns, fe, "_msg", nil)
 	})
 
+	fs := objectstorage.New(t.Name())
 	// Remove the remaining data files for the test
-	fs.MustRemoveDir(t.Name())
+	fs.MustRemoveDir("")
 }

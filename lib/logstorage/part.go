@@ -8,7 +8,7 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/bytesutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	libfs "github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 )
 
@@ -38,10 +38,10 @@ type part struct {
 	// indexBlockHeaders contains a list of indexBlockHeader entries for the given part.
 	indexBlockHeaders []indexBlockHeader
 
-	indexFile              fs.MustReadAtCloser
-	columnsHeaderIndexFile fs.MustReadAtCloser
-	columnsHeaderFile      fs.MustReadAtCloser
-	timestampsFile         fs.MustReadAtCloser
+	indexFile              libfs.MustReadAtCloser
+	columnsHeaderIndexFile libfs.MustReadAtCloser
+	columnsHeaderFile      libfs.MustReadAtCloser
+	timestampsFile         libfs.MustReadAtCloser
 
 	messageBloomValues bloomValuesReaderAt
 	oldBloomValues     bloomValuesReaderAt
@@ -50,11 +50,11 @@ type part struct {
 }
 
 type bloomValuesReaderAt struct {
-	bloom  fs.MustReadAtCloser
-	values fs.MustReadAtCloser
+	bloom  libfs.MustReadAtCloser
+	values libfs.MustReadAtCloser
 }
 
-func (r *bloomValuesReaderAt) appendClosers(dst []fs.MustCloser) []fs.MustCloser {
+func (r *bloomValuesReaderAt) appendClosers(dst []libfs.MustCloser) []libfs.MustCloser {
 	dst = append(dst, r.bloom)
 	dst = append(dst, r.values)
 	return dst
@@ -107,7 +107,7 @@ func mustOpenFilePart(pt *partition, path string) *part {
 	var p part
 	p.pt = pt
 	p.path = path
-	p.ph.mustReadMetadata(path)
+	p.ph.mustReadMetadata(pt.s.fs, path)
 
 	columnNamesPath := filepath.Join(path, columnNamesFilename)
 	columnIdxsPath := filepath.Join(path, columnIdxsFilename)
@@ -137,6 +137,7 @@ func mustOpenFilePart(pt *partition, path string) *part {
 	mrs.MustClose()
 
 	// Open data files
+	fs := pt.s.fs
 	p.indexFile = fs.MustOpenReaderAt(indexPath)
 	if p.ph.FormatVersion >= 1 {
 		p.columnsHeaderIndexFile = fs.MustOpenReaderAt(columnsHeaderIndexPath)
@@ -176,7 +177,7 @@ func mustOpenFilePart(pt *partition, path string) *part {
 func mustClosePart(p *part) {
 	// Close files in parallel in order to speed up this operation
 	// on high-latency storage systems such as NFS and Ceph.
-	var cs []fs.MustCloser
+	var cs []libfs.MustCloser
 
 	cs = append(cs, p.indexFile)
 	if p.ph.FormatVersion >= 1 {
@@ -194,7 +195,7 @@ func mustClosePart(p *part) {
 		}
 	}
 
-	fs.MustCloseParallel(cs)
+	libfs.MustCloseParallel(cs)
 
 	p.pt = nil
 }

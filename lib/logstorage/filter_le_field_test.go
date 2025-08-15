@@ -3,7 +3,7 @@ package logstorage
 import (
 	"testing"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestFilterLeField(t *testing.T) {
@@ -1502,6 +1502,7 @@ func TestFilterLeField(t *testing.T) {
 		testFilterMatchForColumns(t, columns, fe, "foo", nil)
 	})
 
+	fs := objectstorage.New(t.Name())
 	// Remove the remaining data files for the test
-	fs.MustRemoveDir(t.Name())
+	fs.MustRemoveDir("")
 }

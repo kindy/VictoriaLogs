@@ -8,8 +8,8 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/bytesutil"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/encoding"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 // PartitionStats contains stats for the partition.
@@ -41,20 +41,20 @@ type partition struct {
 // The created partition can be opened with mustOpenPartition() after is has been created.
 //
 // The created partition can be deleted with mustDeletePartition() when it is no longer needed.
-func mustCreatePartition(path string) {
+func mustCreatePartition(fs objectstorage.FS, path string) {
 	fs.MustMkdirFailIfExist(path)
 
 	indexdbPath := filepath.Join(path, indexdbDirname)
-	mustCreateIndexdb(indexdbPath)
+	mustCreateIndexdb(fs, indexdbPath)
 
 	datadbPath := filepath.Join(path, datadbDirname)
-	mustCreateDatadb(datadbPath)
+	mustCreateDatadb(fs, datadbPath)
 }
 
 // mustDeletePartition deletes partition at the given path.
 //
 // The partition must be closed with MustClose before deleting it.
-func mustDeletePartition(path string) {
+func mustDeletePartition(fs objectstorage.FS, path string) {
 	fs.MustRemoveDir(path)
 }
 
@@ -65,10 +65,10 @@ func mustOpenPartition(s *Storage, path string) *partition {
 	name := filepath.Base(path)
 
 	indexdbPath := filepath.Join(path, indexdbDirname)
-	isIndexDBExist := fs.IsPathExist(indexdbPath)
+	isIndexDBExist := s.fs.IsPathExist(indexdbPath)
 
 	datadbPath := filepath.Join(path, datadbDirname)
-	isDatadbExist := fs.IsPathExist(datadbPath)
+	isDatadbExist := s.fs.IsPathExist(datadbPath)
 
 	if !isIndexDBExist {
 		if isDatadbExist {
@@ -78,7 +78,7 @@ func mustOpenPartition(s *Storage, path string) *partition {
 		}
 
 		logger.Warnf("creating missing indexdb directory %s, this could happen if VictoriaLogs shuts down uncleanly (via OOM crash, a panic, SIGKILL or hardware shutdown) while creating new per-day partition", indexdbPath)
-		mustCreateIndexdb(indexdbPath)
+		mustCreateIndexdb(s.fs, indexdbPath)
 	}
 	idb := mustOpenIndexdb(indexdbPath, name, s)
 
@@ -92,7 +92,7 @@ func mustOpenPartition(s *Storage, path string) *partition {
 
 	if !isDatadbExist {
 		logger.Warnf("creating missing datadb directory %s, this could happen if VictoriaLogs shuts down uncleanly (via OOM crash, a panic, SIGKILL or hardware shutdown) while creating new per-day partition", datadbPath)
-		mustCreateDatadb(datadbPath)
+		mustCreateDatadb(s.fs, datadbPath)
 	}
 
 	pt.ddb = mustOpenDatadb(pt, datadbPath, s.flushInterval)

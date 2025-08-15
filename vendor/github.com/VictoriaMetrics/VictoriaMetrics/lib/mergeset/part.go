@@ -7,9 +7,10 @@ import (
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/blockcache"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/filestream"
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	libfs "github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/logger"
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/memory"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 var idxbCache = blockcache.NewCache(getMaxIndexBlocksCacheSize)
@@ -80,14 +81,14 @@ type part struct {
 
 	mrs []metaindexRow
 
-	indexFile fs.MustReadAtCloser
-	itemsFile fs.MustReadAtCloser
-	lensFile  fs.MustReadAtCloser
+	indexFile libfs.MustReadAtCloser
+	itemsFile libfs.MustReadAtCloser
+	lensFile  libfs.MustReadAtCloser
 }
 
-func mustOpenFilePart(path string) *part {
+func mustOpenFilePart(fs objectstorage.FS, path string) *part {
 	var ph partHeader
-	ph.MustReadMetadata(path)
+	ph.MustReadMetadata(fs, path)
 
 	metaindexPath := filepath.Join(path, metaindexFilename)
 	metaindexFile := filestream.MustOpen(metaindexPath, true)
@@ -96,21 +97,21 @@ func mustOpenFilePart(path string) *part {
 	// Open part files in parallel in order to speed up this process
 	// on high-latency storage systems such as NFS or Ceph.
 
-	var pro fs.ParallelReaderAtOpener
+	var pro libfs.ParallelReaderAtOpener
 
 	indexPath := filepath.Join(path, indexFilename)
 	itemsPath := filepath.Join(path, itemsFilename)
 	lensPath := filepath.Join(path, lensFilename)
 
-	var indexFile fs.MustReadAtCloser
+	var indexFile libfs.MustReadAtCloser
 	var indexSize uint64
 	pro.Add(indexPath, &indexFile, &indexSize)
 
-	var itemsFile fs.MustReadAtCloser
+	var itemsFile libfs.MustReadAtCloser
 	var itemsSize uint64
 	pro.Add(itemsPath, &itemsFile, &itemsSize)
 
-	var lensFile fs.MustReadAtCloser
+	var lensFile libfs.MustReadAtCloser
 	var lensSize uint64
 	pro.Add(lensPath, &lensFile, &lensSize)
 
@@ -120,7 +121,7 @@ func mustOpenFilePart(path string) *part {
 	return newPart(&ph, path, size, metaindexFile, indexFile, itemsFile, lensFile)
 }
 
-func newPart(ph *partHeader, path string, size uint64, metaindexReader filestream.ReadCloser, indexFile, itemsFile, lensFile fs.MustReadAtCloser) *part {
+func newPart(ph *partHeader, path string, size uint64, metaindexReader filestream.ReadCloser, indexFile, itemsFile, lensFile libfs.MustReadAtCloser) *part {
 	mrs, err := unmarshalMetaindexRows(nil, metaindexReader)
 	if err != nil {
 		logger.Panicf("FATAL: cannot unmarshal metaindexRows from %q: %s", path, err)
@@ -143,12 +144,12 @@ func newPart(ph *partHeader, path string, size uint64, metaindexReader filestrea
 func (p *part) MustClose() {
 	// Close files in parallel in order to speed up this process on storage systems with high latency
 	// such as NFS or Ceph.
-	cs := []fs.MustCloser{
+	cs := []libfs.MustCloser{
 		p.indexFile,
 		p.itemsFile,
 		p.lensFile,
 	}
-	fs.MustCloseParallel(cs)
+	libfs.MustCloseParallel(cs)
 
 	idxbCache.RemoveBlocksForPart(p)
 	ibCache.RemoveBlocksForPart(p)

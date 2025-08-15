@@ -3,7 +3,7 @@ package logstorage
 import (
 	"testing"
 
-	"github.com/VictoriaMetrics/VictoriaMetrics/lib/fs"
+	"github.com/VictoriaMetrics/VictoriaMetrics/lib/objectstorage"
 )
 
 func TestMatchPrefix(t *testing.T) {
@@ -934,5 +934,6 @@ func TestFilterPrefix(t *testing.T) {
 	})
 
 	// Remove the remaining data files for the test
-	fs.MustRemoveDir(t.Name())
+	fs := objectstorage.New(t.Name())
+	fs.MustRemoveDir("")
 }
