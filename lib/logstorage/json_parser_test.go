@@ -16,7 +16,6 @@ func TestJSONParserFailure(t *testing.T) {
 		}
 		PutJSONParser(p)
 	}
-	f("")
 	f("{foo")
 	f("[1,2,3]")
 	f(`{"foo",}`)

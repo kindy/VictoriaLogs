@@ -7,6 +7,7 @@ The folder contains examples of [Vector](https://vector.dev/docs/) integration w
 * [jsonline single node](./jsonline)
 * [jsonline HA setup](./jsonline-ha)
 * [datadog](./datadog)
+* [splunk](./splunk)
 
 ## Quick start
 

@@ -63,6 +63,11 @@ func insertHandler(w http.ResponseWriter, r *http.Request, path string) bool {
 	case "/insert/jsonline":
 		jsonline.RequestHandler(w, r)
 		return true
+	case "/insert/services/collector/event":
+		r.Header.Add("VL-Msg-Field", "event")
+		r.Header.Add("VL-Time-Field", "time")
+		jsonline.RequestHandler(w, r)
+		return true
 	case "/insert/ready":
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)

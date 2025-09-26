@@ -18,14 +18,21 @@ import (
 
 // RequestHandler processes jsonline insert requests
 func RequestHandler(w http.ResponseWriter, r *http.Request) {
-	startTime := time.Now()
-	w.Header().Add("Content-Type", "application/json")
-
-	if r.Method != "POST" {
+	w.Header().Add("Access-Control-Allow-Origin", "*")
+	w.Header().Add("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	switch r.Method {
+	case http.MethodOptions:
+		w.WriteHeader(http.StatusOK)
+		return
+	case http.MethodPost:
+		w.Header().Add("Content-Type", "application/json")
+	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
+	startTime := time.Now()
 	requestsTotal.Inc()
 
 	cp, err := insertutil.GetCommonParams(r)
@@ -103,15 +110,21 @@ func readLine(lr *insertutil.LineReader, timeFields, msgFields []string, lmp ins
 	p := logstorage.GetJSONParser()
 	defer logstorage.PutJSONParser(p)
 
-	if err := p.ParseLogMessage(line); err != nil {
-		return true, fmt.Errorf("%s; line contents: %q", err, line)
+	p.Init(line)
+	for p.NextMessage() {
+		if err := p.Error(); err != nil {
+			return true, err
+		}
+		ts, err := insertutil.ExtractTimestampFromFields(timeFields, p.Fields)
+		if err != nil {
+			return true, err
+		}
+		logstorage.RenameField(p.Fields, msgFields, "_msg")
+		lmp.AddRow(ts, p.Fields, nil)
 	}
-	ts, err := insertutil.ExtractTimestampFromFields(timeFields, p.Fields)
-	if err != nil {
-		return true, fmt.Errorf("%s; line contents: %q", err, line)
+	if err := p.Error(); err != nil {
+		return true, err
 	}
-	logstorage.RenameField(p.Fields, msgFields, "_msg")
-	lmp.AddRow(ts, p.Fields, nil)
 
 	return true, nil
 }

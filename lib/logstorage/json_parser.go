@@ -1,6 +1,7 @@
 package logstorage
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/bytesutil"
@@ -20,8 +21,11 @@ type JSONParser struct {
 	// or until the parser is returned to the pool with PutParser() call.
 	Fields []Field
 
-	// p is used for fast JSON parsing
-	p fastjson.Parser
+	// s is used for fast JSON parsing
+	s fastjson.Scanner
+
+	// err contains parsing error
+	err error
 
 	// buf is used for holding the backing data for Fields
 	buf []byte
@@ -32,6 +36,7 @@ type JSONParser struct {
 }
 
 func (p *JSONParser) reset() {
+	p.err = nil
 	clear(p.Fields)
 	p.Fields = p.Fields[:0]
 
@@ -72,19 +77,9 @@ func (p *JSONParser) ParseLogMessage(msg []byte) error {
 //
 // The p.Fields remains valid until the next call to ParseLogMessage() or PutJSONParser().
 func (p *JSONParser) parseLogMessage(msg []byte, maxFieldNameLen int) error {
-	p.reset()
-
-	msgStr := bytesutil.ToUnsafeString(msg)
-	v, err := p.p.Parse(msgStr)
-	if err != nil {
-		return err
-	}
-	o, err := v.Object()
-	if err != nil {
-		return err
-	}
-	p.Fields, p.buf, p.prefixBuf = appendLogFields(p.Fields, p.buf, p.prefixBuf, o, maxFieldNameLen)
-	return nil
+	p.Init(msg)
+	p.nextMessage(maxFieldNameLen)
+	return p.Error()
 }
 
 func appendLogFields(dst []Field, dstBuf, prefixBuf []byte, o *fastjson.Object, maxFieldNameLen int) ([]Field, []byte, []byte) {
@@ -165,4 +160,36 @@ func appendLogField(dst []Field, dstBuf, prefixBuf, k, value []byte) ([]Field, [
 		Value: valueStr,
 	})
 	return dst, dstBuf
+}
+
+func (p *JSONParser) Init(msg []byte) {
+	p.s.InitBytes(msg)
+}
+
+func (p *JSONParser) NextMessage() bool {
+	return p.nextMessage(maxFieldNameSize)
+}
+
+func (p *JSONParser) nextMessage(maxFieldNameLen int) bool {
+	p.reset()
+	if !p.s.Next() {
+		p.err = p.s.Error()
+		return false
+	}
+	v := p.s.Value()
+	if v == nil {
+		p.err = fmt.Errorf("no value found")
+		return true
+	}
+	o, err := v.Object()
+	if err != nil {
+		p.err = err
+		return true
+	}
+	p.Fields, p.buf, p.prefixBuf = appendLogFields(p.Fields, p.buf, p.prefixBuf, o, maxFieldNameLen)
+	return true
+}
+
+func (p *JSONParser) Error() error {
+	return p.err
 }
