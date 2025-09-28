@@ -8,7 +8,7 @@ import (
 	"github.com/VictoriaMetrics/VictoriaLogs/app/vlinsert/insertutil"
 )
 
-func TestPushProtoOk(t *testing.T) {
+func TestPushProtoOK(t *testing.T) {
 	f := func(src []pb.ResourceLogs, timestampsExpected []int64, resultExpected string) {
 		t.Helper()
 		lr := pb.ExportLogsServiceRequest{
@@ -202,8 +202,58 @@ func TestPushProtoOk(t *testing.T) {
 		`{"_msg":"nested fields","error.type":"document_parsing_exception","error.reason":"failed to parse field [_msg] of type [text]",`+
 			`"error.caused_by.type":"x_content_parse_exception","error.caused_by.reason":"unexpected end-of-input in VALUE_STRING",`+
 			`"error.caused_by.caused_by.type":"json_e_o_f_exception","error.caused_by.caused_by.reason":"eof","severity":"Unspecified"}`)
+
+	// decode ArrayValue
+	f(newLogWithBody(1234, pb.AnyValue{
+		ArrayValue: &pb.ArrayValue{Values: []*pb.AnyValue{{StringValue: ptrTo("foo bar")}}},
+	}),
+		[]int64{1234},
+		`{"_msg":"[\"foo bar\"]","severity":"Unspecified"}`,
+	)
+
+	// decode ArrayValue of ArrayValue
+	f(newLogWithBody(1234, pb.AnyValue{
+		ArrayValue: &pb.ArrayValue{Values: []*pb.AnyValue{
+			{ArrayValue: &pb.ArrayValue{Values: []*pb.AnyValue{{StringValue: ptrTo("foo")}}}},
+			{ArrayValue: &pb.ArrayValue{Values: []*pb.AnyValue{{StringValue: ptrTo("bar")}}}},
+			{ArrayValue: &pb.ArrayValue{Values: []*pb.AnyValue{{StringValue: ptrTo("buz")}}}},
+		}},
+	}),
+		[]int64{1234},
+		`{"_msg":"[[\"foo\"],[\"bar\"],[\"buz\"]]","severity":"Unspecified"}`,
+	)
+
+	// decode BytesValue
+	f(newLogWithBody(1234, pb.AnyValue{
+		BytesValue: ptrTo([]byte("foo bar")),
+	}),
+		[]int64{1234},
+		`{"_msg":"Zm9vIGJhcg==","severity":"Unspecified"}`,
+	)
+
+	// decode KeyValueList
+	f(newLogWithBody(1234, pb.AnyValue{
+		KeyValueList: &pb.KeyValueList{Values: []*pb.KeyValue{
+			{Key: "foo", Value: &pb.AnyValue{StringValue: ptrTo("bar")}},
+			{Key: "bar", Value: &pb.AnyValue{StringValue: ptrTo("buz")}},
+		},
+		},
+	}),
+		[]int64{1234},
+		`{"foo":"bar","bar":"buz","severity":"Unspecified"}`,
+	)
 }
 
 func ptrTo[T any](s T) *T {
 	return &s
+}
+
+func newLogWithBody(timestamp uint64, body pb.AnyValue) []pb.ResourceLogs {
+	return []pb.ResourceLogs{
+		{
+			ScopeLogs: []pb.ScopeLogs{
+				{LogRecords: []pb.LogRecord{{TimeUnixNano: timestamp, Body: body}}},
+			},
+		},
+	}
 }
