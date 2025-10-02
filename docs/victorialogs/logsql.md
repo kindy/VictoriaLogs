@@ -5003,6 +5003,19 @@ The `parallel_readers` option is applied individually to every `vlstorage` node 
 
 Note that too big number of parallel readers may result in excess usage of RAM and CPU.
 
+### `blocks_per_worker` query option
+
+Controls the number of blocks scheduled to a single storage worker at once during the search phase.
+The default is tuned for balanced performance and latency. In specific workloads that touch a very large
+number of blocks, moderately increasing this value can reduce per‑batch scheduling overhead. Example:
+
+```logsql
+options(blocks_per_worker=256) *_msg:error | count()
+```
+
+If this option isn't set, VictoriaLogs uses an internal default. Setting too high values may increase
+tail latency and make cancellations slower, so adjust with care and validate with `| stats_query`.
+
 ### `time_offset` query option
 
 `time_offset` query option subtracts the given offset from all the [time filters](https://docs.victoriametrics.com/victorialogs/logsql/#time-filter) in the query,

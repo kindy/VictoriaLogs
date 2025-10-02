@@ -9,11 +9,12 @@ import (
 	"github.com/VictoriaMetrics/VictoriaMetrics/lib/slicesutil"
 )
 
-// The number of blocks to search at once by a single worker
+// defaultBlockSearchWorksPerBatch is the default number of blocks to schedule
+// to a single worker at once.
 //
-// This number must be increased on systems with many CPU cores in order to amortize
-// the overhead for passing the blockSearchWork to worker goroutines.
-const blockSearchWorksPerBatch = 64
+// This value is chosen as a balance between scheduling overhead and tail latency.
+// It can be overridden per-query via the `options(blocks_per_worker=...)` setting.
+const defaultBlockSearchWorksPerBatch = 64
 
 type blockSearchWork struct {
 	// p is the part where the block belongs to.
@@ -44,14 +45,28 @@ func (bswb *blockSearchWorkBatch) reset() {
 	bswb.bsws = bsws[:0]
 }
 
-func getBlockSearchWorkBatch() *blockSearchWorkBatch {
+// getBlockSearchWorkBatch returns a reusable batch with the given capacity.
+// If capacity <= 0, the default is used.
+func getBlockSearchWorkBatch(capacity int) *blockSearchWorkBatch {
 	v := blockSearchWorkBatchPool.Get()
 	if v == nil {
+		if capacity <= 0 {
+			capacity = defaultBlockSearchWorksPerBatch
+		}
 		return &blockSearchWorkBatch{
-			bsws: make([]blockSearchWork, 0, blockSearchWorksPerBatch),
+			bsws: make([]blockSearchWork, 0, capacity),
 		}
 	}
-	return v.(*blockSearchWorkBatch)
+	b := v.(*blockSearchWorkBatch)
+	// Ensure capacity matches requested capacity on the first use after Get().
+	// If the capacity differs, reallocate with the requested capacity.
+	if capacity <= 0 {
+		capacity = defaultBlockSearchWorksPerBatch
+	}
+	if cap(b.bsws) != capacity {
+		b.bsws = make([]blockSearchWork, 0, capacity)
+	}
+	return b
 }
 
 func putBlockSearchWorkBatch(bswb *blockSearchWorkBatch) {

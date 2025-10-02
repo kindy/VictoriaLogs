@@ -401,6 +401,10 @@ type queryOptions struct {
 
 	// timeOffsetStr is a string representation of the timeOffset.
 	timeOffsetStr string
+
+	// blocksPerWorker is the number of blocks scheduled to a single worker at once
+	// during search. If it is zero, the default is used.
+	blocksPerWorker uint
 }
 
 func (opts *queryOptions) String() string {
@@ -411,6 +415,9 @@ func (opts *queryOptions) String() string {
 	if opts.concurrency > 0 {
 		a = append(a, fmt.Sprintf("concurrency=%d", opts.concurrency))
 	}
+	if opts.parallelReaders > 0 {
+		a = append(a, fmt.Sprintf("parallel_readers=%d", opts.parallelReaders))
+	}
 	if opts.ignoreGlobalTimeFilter != nil {
 		a = append(a, fmt.Sprintf("ignore_global_time_filter=%v", *opts.ignoreGlobalTimeFilter))
 	}
@@ -419,6 +426,9 @@ func (opts *queryOptions) String() string {
 	}
 	if opts.timeOffsetStr != "" {
 		a = append(a, fmt.Sprintf("time_offset=%s", opts.timeOffsetStr))
+	}
+	if opts.blocksPerWorker > 0 {
+		a = append(a, fmt.Sprintf("blocks_per_worker=%d", opts.blocksPerWorker))
 	}
 	if len(a) == 0 {
 		return ""
@@ -1837,6 +1847,13 @@ func parseQueryOptions(dstOpts *queryOptions, lex *lexer) error {
 				return fmt.Errorf("cannot parse 'parallel_readers=%q' option as unsigned integer", v)
 			}
 			dstOpts.parallelReaders = uint(n)
+			dstOpts.needPrint = true
+		case "blocks_per_worker":
+			n, ok := tryParseUint64(v)
+			if !ok {
+				return fmt.Errorf("cannot parse 'blocks_per_worker=%q' option as unsigned integer", v)
+			}
+			dstOpts.blocksPerWorker = uint(n)
 			dstOpts.needPrint = true
 		case "ignore_global_time_filter":
 			ignoreGlobalTimeFilter, err := strconv.ParseBool(v)

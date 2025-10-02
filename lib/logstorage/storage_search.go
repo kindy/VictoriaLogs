@@ -110,6 +110,10 @@ type genericSearchOptions struct {
 
 	// timeOffset is the offset in nanoseconds, which must be subtracted from the selected the _time values before these values are passed to query pipes.
 	timeOffset int64
+
+	// blocksPerWorker is the number of blocks scheduled to a single worker at once.
+	// If it is <= 0, the default is used.
+	blocksPerWorker int
 }
 
 type searchOptions struct {
@@ -132,6 +136,10 @@ type searchOptions struct {
 
 	// fieldsFilter is the filter of fields to return in the result
 	fieldsFilter *prefixfilter.Filter
+
+	// blocksPerWorker is the number of blocks scheduled to a single worker at once.
+	// If it is <= 0, the default is used.
+	blocksPerWorker int
 }
 
 // WriteDataBlockFunc must process the db.
@@ -194,13 +202,14 @@ func (s *Storage) runQuery(qctx *QueryContext, writeBlock writeBlockResultFunc) 
 	fieldsFilter := getNeededColumns(q.pipes)
 
 	so := &genericSearchOptions{
-		tenantIDs:    qctx.TenantIDs,
-		streamIDs:    streamIDs,
-		minTimestamp: minTimestamp,
-		maxTimestamp: maxTimestamp,
-		filter:       q.f,
-		fieldsFilter: fieldsFilter,
-		timeOffset:   -q.opts.timeOffset,
+		tenantIDs:       qctx.TenantIDs,
+		streamIDs:       streamIDs,
+		minTimestamp:    minTimestamp,
+		maxTimestamp:    maxTimestamp,
+		filter:          q.f,
+		fieldsFilter:    fieldsFilter,
+		timeOffset:      -q.opts.timeOffset,
+		blocksPerWorker: int(q.opts.blocksPerWorker),
 	}
 
 	search := func(stopCh <-chan struct{}, writeBlockToPipes writeBlockResultFunc) error {
@@ -1356,12 +1365,13 @@ func (pt *partition) search(sf *StreamFilter, f filter, so *genericSearchOptions
 		f = initStreamFilters(so.tenantIDs, pt.idb, f)
 	}
 	soInternal := &searchOptions{
-		tenantIDs:    tenantIDs,
-		streamIDs:    streamIDs,
-		minTimestamp: so.minTimestamp,
-		maxTimestamp: so.maxTimestamp,
-		filter:       f,
-		fieldsFilter: so.fieldsFilter,
+		tenantIDs:       tenantIDs,
+		streamIDs:       streamIDs,
+		minTimestamp:    so.minTimestamp,
+		maxTimestamp:    so.maxTimestamp,
+		filter:          f,
+		fieldsFilter:    so.fieldsFilter,
+		blocksPerWorker: so.blocksPerWorker,
 	}
 	return pt.ddb.search(soInternal, qs, workCh, stopCh)
 }
@@ -1492,7 +1502,7 @@ func (p *part) searchByTenantIDs(so *searchOptions, qs *QueryStats, bhss *blockH
 	// it is assumed that tenantIDs are sorted
 	tenantIDs := so.tenantIDs
 
-	bswb := getBlockSearchWorkBatch()
+	bswb := getBlockSearchWorkBatch(so.blocksPerWorker)
 	scheduleBlockSearch := func(bh *blockHeader) bool {
 		if bswb.appendBlockSearchWork(p, so, bh) {
 			return true
@@ -1501,7 +1511,7 @@ func (p *part) searchByTenantIDs(so *searchOptions, qs *QueryStats, bhss *blockH
 		case <-stopCh:
 			return false
 		case workCh <- bswb:
-			bswb = getBlockSearchWorkBatch()
+			bswb = getBlockSearchWorkBatch(so.blocksPerWorker)
 			return true
 		}
 	}
@@ -1594,7 +1604,7 @@ func (p *part) searchByStreamIDs(so *searchOptions, qs *QueryStats, bhss *blockH
 	// it is assumed that streamIDs are sorted
 	streamIDs := so.streamIDs
 
-	bswb := getBlockSearchWorkBatch()
+	bswb := getBlockSearchWorkBatch(so.blocksPerWorker)
 	scheduleBlockSearch := func(bh *blockHeader) bool {
 		if bswb.appendBlockSearchWork(p, so, bh) {
 			return true
@@ -1603,7 +1613,7 @@ func (p *part) searchByStreamIDs(so *searchOptions, qs *QueryStats, bhss *blockH
 		case <-stopCh:
 			return false
 		case workCh <- bswb:
-			bswb = getBlockSearchWorkBatch()
+			bswb = getBlockSearchWorkBatch(so.blocksPerWorker)
 			return true
 		}
 	}
