@@ -1,0 +1,2320 @@
+{
+    "annotations": {
+      "list": [
+        {
+          "builtIn": 1,
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PE8D8DB4BEE4E4B22"
+          },
+          "enable": true,
+          "hide": true,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Annotations & Alerts",
+          "target": {
+            "limit": 100,
+            "matchAny": false,
+            "tags": [],
+            "type": "dashboard"
+          },
+          "type": "dashboard"
+        }
+      ]
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 1,
+    "id": 6,
+    "links": [],
+    "panels": [
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 0
+        },
+        "id": 59,
+        "panels": [],
+        "title": "General",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Total log entries matching $filter in the selected time range. Use to sanity-check ingestion volume, baseline changes after deploys, or quickly count specific events by refining the filter (e.g., level:=error).",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "sishort"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 6,
+          "x": 0,
+          "y": 1
+        },
+        "id": 29,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "center",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "text": {},
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | count()",
+            "queryType": "stats",
+            "refId": "A"
+          }
+        ],
+        "title": "Total logs",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Time since the newest matching log. Use to detect pipeline delay or backpressure; alert if it exceeds your acceptable threshold.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "ns"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 6,
+          "x": 6,
+          "y": 1
+        },
+        "id": 57,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | first 1 by (_time desc) | math (now() - _time) default 0 as lag_ns | max(lag_ns) as lag_ns",
+            "queryType": "stats",
+            "refId": "A"
+          }
+        ],
+        "title": "Last Log Age",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Records-per-second over time for the current filter. Use to spot bursts/drops, correlate with incidents, and validate throttling or autoscaling effects.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "palette-classic"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": 60000,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "none"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 7,
+          "w": 12,
+          "x": 12,
+          "y": 1
+        },
+        "id": 33,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | stats () rate()",
+            "legendFormat": "rate",
+            "queryType": "statsRange",
+            "refId": "A"
+          }
+        ],
+        "title": "Log ingestion rate",
+        "type": "timeseries"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 8
+        },
+        "id": 43,
+        "panels": [],
+        "title": "Fields",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Fields are ranked by storage consumption (including `bytes/row`). Use this to find storage-heavy or poorly compressing fields (high `bytes/row` but relatively few `rows`) and consider:\n\n- dropping unused fields, \n- splitting dense text into structured keys.\n\n```\n{\n  \"level\": \"info\",\n  \"user_id\": \"alice\",\n  \"product.id\": \"123\",\n  \"product.name\": \"Super Widget\",\n  \"product.category\": \"widgets\",\n  \"product.attributes.color\": \"red\",\n  \"product.attributes.size\": \"large\",\n  \"product.price\": \"2999\",\n  \"_msg\": \"paid\"\n}\n```",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto",
+                "wrapText": false
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "bytes"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "sishort"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Total bytes"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "gauge",
+                    "valueDisplayMode": "color"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 10,
+          "w": 24,
+          "x": 0,
+          "y": 9
+        },
+        "id": 28,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | block_stats\n  | stats by (field)\n      sum(values_bytes) as values_bytes,\n      sum(bloom_bytes) as bloom_bytes,\n      sum(rows) as rows\n  | math\n      (values_bytes+bloom_bytes) as total_bytes,\n      round(total_bytes / rows, 0.01) as bytes_per_row\n  | sort by (total_bytes desc) limit $limit\n  | total_stats min(total_bytes) as min_total_bytes, max(total_bytes) as max_total_bytes",
+            "hide": false,
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit heaviest fields",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "total_bytes"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_total_bytes",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_total_bytes",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "k": true,
+                "max_bytes_per_row": false,
+                "max_total_bytes": true,
+                "min_bytes_per_row": false,
+                "min_total_bytes": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "bloom_bytes": 5,
+                "bytes_per_row": 3,
+                "field": 0,
+                "k": 6,
+                "max_bytes_per_row": 7,
+                "min_bytes_per_row": 8,
+                "rows": 2,
+                "total_bytes": 1,
+                "values_bytes": 4
+              },
+              "renameByName": {
+                "bloom_bytes": "Bloom filter bytes",
+                "bytes_per_row": "Bytes/row",
+                "field": "Field",
+                "rows": "Rows",
+                "total_bytes": "Total bytes",
+                "values_bytes": "Value bytes"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Number of field names that appear in ≤ dangling_threshold ($dangling_threshold) logs within the selected time range. \n\nA high count often points to typos, inconsistent naming, or one-off fields that bloat schema and storage. Use this to target cleanup: standardize key names, fix instrumentation, or drop ephemeral fields. Increase the threshold to widen the search.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": []
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 5,
+          "x": 0,
+          "y": 19
+        },
+        "id": 60,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "text": {},
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | field_names | hits:<=$dangling_threshold | count()",
+            "legendFormat": "count",
+            "queryType": "stats",
+            "refId": "A"
+          }
+        ],
+        "title": "Dangling field names (threshold: $dangling_threshold)",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "This panel is a useful tool for schema discovery.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto",
+                "wrapText": false
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Log count"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 5,
+          "y": 19
+        },
+        "id": 50,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | field_names\n  | sort by (hits desc) limit $limit\n  | total_stats max(hits) as max_count, min(hits) as min_count\n  | math min_count%max_count as min_count",
+            "legendFormat": "{{_msg}}",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit field names (desc)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "hits"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "hits": false,
+                "max_count": true,
+                "min_count": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "hits": 1,
+                "name": 0
+              },
+              "renameByName": {
+                "hits": "Log count",
+                "name": "Field name",
+                "stream": "Stream"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Least frequently present field names. Use this to find stale, rare, or dynamic keys that can be removed. Dangling field names can be harmful because they are treated as columns in storage. Having many stable field names is fine, but having too many field names over time is not.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto",
+                "wrapText": false
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Log count"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 11,
+          "x": 13,
+          "y": 19
+        },
+        "id": 54,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | field_names\n  | sort by (hits asc) limit $limit\n  | total_stats max(hits) as max_count, min(hits) as min_count",
+            "legendFormat": "{{_msg}}",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit field names (asc)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "hits"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "hits": false,
+                "max_count": true,
+                "min_count": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "hits": 1,
+                "name": 0
+              },
+              "renameByName": {
+                "hits": "Log count",
+                "name": "Field name",
+                "stream": "Stream"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "This panel shows the most frequently seen logs, it is extremely valuable for:\n- Operations teams: Spotting noisy logs\n- Developers: Understanding application behavior\n- Cost optimization: Identifying high-volume logs to reduce\n- Debugging: Finding common error patterns\n\nClick on the log to drill down and see the specific logs that belong to that pattern.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto",
+                "wrapText": false
+              },
+              "inspect": true
+            },
+            "links": [
+              {
+                "targetBlank": true,
+                "title": "Drilldown",
+                "url": "/d/be5zidev72m80f?viewPanel=64&var-drilldown_pattern=${__value.text}"
+              }
+            ],
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Log count"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "_msg"
+              },
+              "properties": []
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 13,
+          "x": 0,
+          "y": 28
+        },
+        "id": 55,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | collapse_nums prettify\n  | stats by (_msg) count() as hits\n  | sort by (hits desc) limit $limit\n  | total_stats max(hits) as max_count, min(hits) as min_count\n  | rename _msg msg",
+            "legendFormat": "",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit _msg patterns (desc)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "format": "json",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "hits"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "hits": false,
+                "max_count": true,
+                "min_count": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "hits": 1,
+                "max_count": 2,
+                "min_count": 3,
+                "msg": 0
+              },
+              "renameByName": {
+                "hits": "Log count",
+                "msg": "_msg",
+                "name": "Field name",
+                "stream": "Stream"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "This panel tells you which specific field=value pairs dominate your filtered logs right now (excluding stream metadata), so you can act fast. Some practical use cases:\n\nIncident triage (last 10–30m, errors)\n- See which endpoint, status, pod, namespace, error_code, or client_ip shows up most.\n\nNoisy source hunt (info logs)\n- Identify the chattiest user_agents, clients, hosts, or paths driving volume.\n\nData quality/enrichment check\n- Spot bad values like namespace=unknown or service=missing bubbling into the top list.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto",
+                "wrapText": false
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Log count"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 11,
+          "x": 13,
+          "y": 28
+        },
+        "id": 56,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | facets\n  | filter -field_name:in(_stream_id,_stream)\n  | sort by (hits) desc limit $limit\n  | total_stats max(hits) as max_count, min(hits) as min_count",
+            "legendFormat": "",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit fields (key-value pair)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "format": "json",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "hits"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "hits": false,
+                "max_count": true,
+                "min_count": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "field_name": 2,
+                "field_value": 3,
+                "hits": 4,
+                "max_count": 0,
+                "min_count": 1
+              },
+              "renameByName": {
+                "hits": "Log count",
+                "name": "Field name",
+                "stream": "Stream"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 37
+        },
+        "id": 58,
+        "panels": [],
+        "title": "Streams",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Tracks how many distinct log streams exist in the logs that match your filter. The result tells you the size/complexity of the selected dataset (how many unique stream signatures are active), which is practical for tracking stream cardinality, scope of activity, and changes over time.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "purple",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "sishort"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 4,
+          "x": 0,
+          "y": 38
+        },
+        "id": 35,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | stats count_uniq(_stream) as active_streams",
+            "queryType": "stats",
+            "refId": "A"
+          }
+        ],
+        "title": "Total streams",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "This panel gives you a time series of \"how many distinct log streams are active\" per interval, so you can see the footprint and churn of your logs over time.\n\nWatch for spikes that signal cardinality explosions after a config change, sudden drops that indicate ingestion gaps or outages, and steady growth that drives storage and index pressure.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "fixedColor": "dark-purple",
+              "mode": "fixed"
+            },
+            "custom": {
+              "axisBorderShow": false,
+              "axisCenteredZero": false,
+              "axisColorMode": "text",
+              "axisLabel": "",
+              "axisPlacement": "auto",
+              "barAlignment": 0,
+              "barWidthFactor": 0.6,
+              "drawStyle": "line",
+              "fillOpacity": 0,
+              "gradientMode": "none",
+              "hideFrom": {
+                "legend": false,
+                "tooltip": false,
+                "viz": false
+              },
+              "insertNulls": 3600000,
+              "lineInterpolation": "linear",
+              "lineWidth": 1,
+              "pointSize": 5,
+              "scaleDistribution": {
+                "type": "linear"
+              },
+              "showPoints": "auto",
+              "spanNulls": false,
+              "stacking": {
+                "group": "A",
+                "mode": "none"
+              },
+              "thresholdsStyle": {
+                "mode": "off"
+              }
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "dark-purple",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "none"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 8,
+          "x": 4,
+          "y": 38
+        },
+        "id": 30,
+        "options": {
+          "legend": {
+            "calcs": [],
+            "displayMode": "list",
+            "placement": "bottom",
+            "showLegend": true
+          },
+          "tooltip": {
+            "hideZeros": false,
+            "mode": "single",
+            "sort": "none"
+          }
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | stats count_uniq(_stream) as active_streams",
+            "queryType": "statsRange",
+            "refId": "A"
+          }
+        ],
+        "title": "Active streams (step: $__interval) (cardinality)",
+        "type": "timeseries"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Busiest streams by log count. Use to identify top talkers for tuning (log level, sampling) and to focus triage/drilldowns on high-impact producers.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "dark-purple",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Log count"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 38
+        },
+        "id": 46,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | stats by (_stream) count() as hits\n  | first $limit (hits desc)\n  | copy _stream as stream\n  | fields stream, hits\n  | total_stats max(hits) as max_count, min(hits) as min_count",
+            "legendFormat": "",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit streams (asc)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "format": "auto",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "hits"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max",
+                  "reducerId": "lastNotNull"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "hits": false,
+                "max_count": true,
+                "min_count": true,
+                "totals": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "hits": 1,
+                "stream": 0
+              },
+              "renameByName": {
+                "hits": "Log count",
+                "stream": "Stream",
+                "totals": ""
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "It measures how many low-activity streams you have within the window. \n\nA rising population of tiny streams usually means your stream value includes high‑cardinality fields (IDs, timestamps, random tokens) or an agent is mislabeling logs. That fragments data into many small streams, increases index/metadata overhead, and slows queries even if each stream is small.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "mappings": [],
+            "noValue": "0",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "semi-dark-purple",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "rows"
+              },
+              "properties": [
+                {
+                  "id": "unit",
+                  "value": "none"
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 4,
+          "x": 0,
+          "y": 47
+        },
+        "id": 38,
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "justifyMode": "auto",
+          "orientation": "auto",
+          "percentChangeColorMode": "standard",
+          "reduceOptions": {
+            "calcs": [
+              "lastNotNull"
+            ],
+            "fields": "",
+            "values": false
+          },
+          "showPercentChange": false,
+          "textMode": "auto",
+          "wideLayout": true
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | stats (_stream) count() as hits | hits:<=$dangling_threshold | count()",
+            "queryType": "stats",
+            "refId": "A"
+          }
+        ],
+        "title": "Total dangling streams (dangling_threshold: $dangling_threshold)",
+        "type": "stat"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Streams with the smallest log counts in the current window. Surface quiet or stale streams that may need attention.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "dark-purple",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Log count"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                },
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "mode": "gradient",
+                    "type": "gauge",
+                    "valueDisplayMode": "text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 20,
+          "x": 4,
+          "y": 47
+        },
+        "id": 53,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | stats by (_stream) count() as hits\n  | first $limit (hits asc)\n  | copy _stream as stream\n  | fields stream, hits\n  | total_stats max(hits) as max_count, min(hits) as min_count",
+            "legendFormat": "",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Top $limit (dangling) streams (asc)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "format": "auto",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "hits"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max",
+                  "reducerId": "lastNotNull"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "hits": false,
+                "max_count": true,
+                "min_count": true,
+                "totals": true
+              },
+              "includeByName": {},
+              "indexByName": {
+                "hits": 1,
+                "stream": 0
+              },
+              "renameByName": {
+                "hits": "Log count",
+                "stream": "Stream",
+                "totals": ""
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 56
+        },
+        "id": 44,
+        "panels": [],
+        "title": "Grouping by ($group)",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Per-group log throughput (RPS) for a selectable field. Use to compare namespaces/pods/services, pinpoint hot spots, and confirm whether traffic shifts match expectations.",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto",
+                "wrapText": false
+              },
+              "inspect": true
+            },
+            "links": [],
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                },
+                {
+                  "color": "red",
+                  "value": 80
+                }
+              ]
+            },
+            "unit": "short"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Value"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "gauge"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 0,
+          "y": 57
+        },
+        "id": 42,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | stats by ($group) rate() as value\n  | sort by (value desc) limit $limit\n  | total_stats max(value) as max_count, min(value) as min_count\n  | rename _stream as __stream\n  | rename value \"~value\"",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Records/s by ($group)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "~value"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "kubernetes.pod_namespace": false,
+                "labels": true,
+                "level": true,
+                "max_count": true,
+                "min_count": true,
+                "value": false
+              },
+              "includeByName": {},
+              "indexByName": {
+                "client_stream": 3,
+                "kubernetes.container_name": 0,
+                "kubernetes.pod_namespace": 1,
+                "stream": 2,
+                "value": 4
+              },
+              "orderBy": [
+                {
+                  "desc": false,
+                  "type": "name"
+                }
+              ],
+              "orderByMode": "auto",
+              "renameByName": {
+                "Line": "($group)",
+                "__stream": "_stream",
+                "hits": "Log count",
+                "name": "Field name",
+                "value": "",
+                "~value": "Value"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Ranks your chosen groups by total log payload, so you can see which dimensions produce the most bytes. \n\nUse it to find \"top talkers\" by volume (cost and storage drivers), spot overly verbose components, and decide where to reduce noise or sample. Set $group to the dimension you care about (for example, service, namespace, pod, path)\n",
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "custom": {
+              "align": "auto",
+              "cellOptions": {
+                "type": "auto"
+              },
+              "inspect": false
+            },
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {
+                  "color": "green",
+                  "value": 0
+                }
+              ]
+            },
+            "unit": "decbytes"
+          },
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "__stream"
+              },
+              "properties": [
+                {
+                  "id": "displayName",
+                  "value": "_stream"
+                }
+              ]
+            },
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Value"
+              },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": {
+                    "type": "gauge"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 9,
+          "w": 12,
+          "x": 12,
+          "y": 57
+        },
+        "id": 45,
+        "options": {
+          "cellHeight": "sm",
+          "footer": {
+            "countRows": false,
+            "fields": "",
+            "reducer": [
+              "sum"
+            ],
+            "show": false
+          },
+          "showHeader": true,
+          "sortBy": []
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter\n  | stats by ($group) sum_len() as value\n  | sort by (value desc) limit 10\n  | total_stats max(value) as max_count, min(value) as min_count\n  | rename _stream as __stream\n  | rename value \"~value\"",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Bytes (length) by ($group)",
+        "transformations": [
+          {
+            "id": "extractFields",
+            "options": {
+              "delimiter": ",",
+              "keepTime": false,
+              "replace": true,
+              "source": "labels"
+            }
+          },
+          {
+            "id": "configFromData",
+            "options": {
+              "applyTo": {
+                "id": "byName",
+                "options": "~value"
+              },
+              "configRefId": "A",
+              "mappings": [
+                {
+                  "fieldName": "max_count",
+                  "handlerKey": "max"
+                },
+                {
+                  "fieldName": "min_count",
+                  "handlerKey": "min"
+                }
+              ]
+            }
+          },
+          {
+            "id": "organize",
+            "options": {
+              "excludeByName": {
+                "Time": true,
+                "kubernetes.pod_namespace": false,
+                "labels": true,
+                "level": true,
+                "max_count": true,
+                "min_count": true,
+                "value": false
+              },
+              "includeByName": {},
+              "indexByName": {
+                "hits": 1,
+                "name": 0
+              },
+              "orderByMode": "manual",
+              "renameByName": {
+                "Line": "($group)",
+                "hits": "Log count",
+                "name": "Field name",
+                "~value": "Value"
+              }
+            }
+          }
+        ],
+        "type": "table"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 66
+        },
+        "id": 61,
+        "panels": [],
+        "title": "Raw",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "Recent 500 logs matching $filter. Use for quick spot checks, validating patterns from the tables above, and sampling before writing more specific filters.",
+        "fieldConfig": {
+          "defaults": {},
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Value"
+              },
+              "properties": []
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 13,
+          "w": 24,
+          "x": 0,
+          "y": 67
+        },
+        "id": 62,
+        "options": {
+          "dedupStrategy": "none",
+          "enableInfiniteScrolling": false,
+          "enableLogDetails": true,
+          "prettifyLogMessage": false,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": false,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter | sort by (_time) desc limit 500",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Logs (limit 500)",
+        "type": "logs"
+      },
+      {
+        "collapsed": false,
+        "gridPos": {
+          "h": 1,
+          "w": 24,
+          "x": 0,
+          "y": 80
+        },
+        "id": 63,
+        "panels": [],
+        "title": "Drilldown (used by the panels above, not used directly)",
+        "type": "row"
+      },
+      {
+        "datasource": {
+          "type": "victoriametrics-logs-datasource",
+          "uid": "${ds}"
+        },
+        "description": "It’s a drilldown to inspect real log lines that match a chosen message template.",
+        "fieldConfig": {
+          "defaults": {},
+          "overrides": [
+            {
+              "matcher": {
+                "id": "byName",
+                "options": "Value"
+              },
+              "properties": []
+            }
+          ]
+        },
+        "gridPos": {
+          "h": 11,
+          "w": 12,
+          "x": 0,
+          "y": 81
+        },
+        "id": 64,
+        "options": {
+          "dedupStrategy": "none",
+          "enableInfiniteScrolling": false,
+          "enableLogDetails": true,
+          "prettifyLogMessage": false,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": false,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "pluginVersion": "12.1.1",
+        "targets": [
+          {
+            "datasource": {
+              "type": "victoriametrics-logs-datasource",
+              "uid": "${ds}"
+            },
+            "editorMode": "code",
+            "expr": "$filter _msg:pattern_match(`$drilldown_pattern`) | sort by (_time) desc limit 500",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ],
+        "title": "Logs by pattern (limit 500)",
+        "type": "logs"
+      }
+    ],
+    "preload": false,
+    "refresh": "",
+    "schemaVersion": 41,
+    "tags": [
+      "demo"
+    ],
+    "templating": {
+      "list": [
+        {
+          "current": {
+            "text": "VictoriaLogs Cluster",
+            "value": "P09F761F3828B5D8F"
+          },
+          "includeAll": false,
+          "label": "ds",
+          "name": "ds",
+          "options": [],
+          "query": "victoriametrics-logs-datasource",
+          "refresh": 1,
+          "regex": "",
+          "type": "datasource"
+        },
+        {
+          "current": {
+            "text": "*",
+            "value": "*"
+          },
+          "description": "Custom LogsQL filter attached to every query.\nType any word or phrase you want to look for. Set to \"*\" to not filter.\nSee https://docs.victoriametrics.com/victorialogs/logsql/#word-filter",
+          "name": "filter",
+          "options": [
+            {
+              "selected": true,
+              "text": "*",
+              "value": "*"
+            }
+          ],
+          "query": "*",
+          "type": "textbox"
+        },
+        {
+          "allValue": " ",
+          "current": {
+            "text": "_stream",
+            "value": "_stream"
+          },
+          "datasource": {
+            "type": "victoriametrics-logs-datasource",
+            "uid": "${ds}"
+          },
+          "definition": "",
+          "includeAll": true,
+          "name": "group",
+          "options": [],
+          "query": {
+            "field": "",
+            "limit": 25,
+            "query": "",
+            "refId": "VictoriaLogsVariableQueryEditor-VariableQuery",
+            "type": "fieldName"
+          },
+          "refresh": 1,
+          "regex": "",
+          "type": "query"
+        },
+        {
+          "current": {
+            "text": "20",
+            "value": "20"
+          },
+          "description": "",
+          "name": "limit",
+          "options": [
+            {
+              "selected": true,
+              "text": "20",
+              "value": "20"
+            },
+            {
+              "selected": false,
+              "text": "50",
+              "value": "50"
+            },
+            {
+              "selected": false,
+              "text": "100",
+              "value": "100"
+            }
+          ],
+          "query": "20,50,100",
+          "type": "custom"
+        },
+        {
+          "current": {
+            "text": "1",
+            "value": "1"
+          },
+          "label": "dangling threshold",
+          "name": "dangling_threshold",
+          "options": [
+            {
+              "selected": true,
+              "text": "1",
+              "value": "1"
+            },
+            {
+              "selected": false,
+              "text": "2",
+              "value": "2"
+            },
+            {
+              "selected": false,
+              "text": "5",
+              "value": "5"
+            }
+          ],
+          "query": "1,2,5",
+          "type": "custom"
+        },
+        {
+          "allowCustomValue": true,
+          "current": {
+            "text": "",
+            "value": ""
+          },
+          "description": "",
+          "hide": 2,
+          "name": "drilldown_pattern",
+          "options": [],
+          "query": "",
+          "type": "custom"
+        },
+        {
+          "allowCustomValue": true,
+          "current": {
+            "text": "{}",
+            "value": "{}"
+          },
+          "description": "",
+          "hide": 2,
+          "name": "drilldown_group",
+          "options": [
+            {
+              "selected": true,
+              "text": "{}",
+              "value": "{}"
+            }
+          ],
+          "query": "{}",
+          "type": "custom"
+        },
+        {
+          "current": {
+            "text": "\"",
+            "value": "\""
+          },
+          "description": "",
+          "hide": 2,
+          "name": "quote",
+          "options": [],
+          "query": "",
+          "type": "custom"
+        }
+      ]
+    },
+    "time": {
+      "from": "now-3h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "VictoriaLogs - Logging State",
+    "uid": "be5zidev72m80f",
+    "version": 22
+  }
